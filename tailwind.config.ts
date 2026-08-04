@@ -5,6 +5,7 @@ const config: Config = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  darkMode: "media",
   theme: {
     extend: {
       colors: {
@@ -20,6 +21,19 @@ const config: Config = {
           800: "#6c4d1c",
           900: "#5c421c",
         },
+        navy: {
+          DEFAULT: "#111921",
+          soft: "#18202a",
+        },
+      },
+      fontFamily: {
+        sans: [
+          "var(--font-dm-sans)",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "sans-serif",
+        ],
       },
     },
   },

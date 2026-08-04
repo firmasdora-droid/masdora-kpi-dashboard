@@ -168,14 +168,14 @@ export default function SalesPage() {
   ];
 
   if (loading) {
-    return <p className="text-sm text-gray-500">Memuatkan...</p>;
+    return <p className="text-sm text-muted">Memuatkan...</p>;
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-brand-800">Key-in Jualan</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-xl font-bold text-white">Key-in Jualan</h2>
+        <p className="text-sm text-muted">
           Rekod jualan harian bagi jawatan yang layak.
         </p>
       </div>
@@ -298,7 +298,7 @@ export default function SalesPage() {
             />
           </div>
           {message && (
-            <p className="md:col-span-3 text-sm text-brand-700">{message}</p>
+            <p className="md:col-span-3 text-sm text-brand-400">{message}</p>
           )}
           <div className="md:col-span-3">
             <button type="submit" className="btn-primary" disabled={saving}>
@@ -307,7 +307,7 @@ export default function SalesPage() {
           </div>
         </form>
       ) : (
-        <div className="card text-sm text-gray-600">
+        <div className="card text-sm text-gray-300">
           Jawatan anda tidak layak untuk key-in jualan. Hanya CS Web, CS
           Shopee, CS TikTok, Videographer Produk & Shopee, dan Manager yang
           boleh merekod jualan.
@@ -315,7 +315,7 @@ export default function SalesPage() {
       )}
 
       <div>
-        <h3 className="mb-2 font-semibold text-brand-800">
+        <h3 className="mb-2 font-semibold text-white">
           Jumlah Jualan Bulan Ini
         </h3>
         <DataTable<MonthlyRow>

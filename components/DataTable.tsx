@@ -18,14 +18,14 @@ export default function DataTable<T>({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+      <div className="rounded-lg border border-dashed border-white/15 p-6 text-center text-sm text-muted">
         {emptyMessage}
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-100">
+    <div className="overflow-x-auto rounded-lg border border-white/10">
       <table className="table-base">
         <thead>
           <tr>

@@ -110,36 +110,36 @@ export default function KpiDefinitionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-brand-800">Definisi KPI</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-xl font-bold text-white">Definisi KPI</h2>
+        <p className="text-sm text-muted">
           Urus sasaran lalai, berat, arah, status aktif, serta lulus/tolak
           cadangan KPI baru.
         </p>
       </div>
 
-      {message && <p className="text-sm text-red-600">{message}</p>}
+      {message && <p className="text-sm text-red-400">{message}</p>}
 
       <div>
-        <h3 className="mb-2 font-semibold text-brand-800">
+        <h3 className="mb-2 font-semibold text-white">
           Menunggu Kelulusan
         </h3>
         {pending.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+          <div className="rounded-lg border border-dashed border-white/15 p-6 text-center text-sm text-muted">
             Tiada cadangan KPI menunggu kelulusan.
           </div>
         ) : (
           <div className="space-y-3">
             {pending.map((p) => (
               <div key={p.id} className="card">
-                <p className="font-semibold text-brand-800">
+                <p className="font-semibold text-white">
                   {p.name} ({p.id}) - {p.position_code}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted">
                   Dicadangkan oleh {p.proposed_by_name ?? "-"} untuk{" "}
                   {p.proposed_for_name ?? "-"}
                 </p>
                 {p.description && (
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="mt-1 text-sm text-gray-300">
                     {p.description}
                   </p>
                 )}
@@ -175,15 +175,15 @@ export default function KpiDefinitionsPage() {
       </div>
 
       <div>
-        <h3 className="mb-2 font-semibold text-brand-800">
+        <h3 className="mb-2 font-semibold text-white">
           Definisi KPI Aktif
         </h3>
         {loading ? (
-          <p className="text-sm text-gray-500">Memuatkan...</p>
+          <p className="text-sm text-muted">Memuatkan...</p>
         ) : (
           grouped.map(([positionCode, defs]) => (
             <div key={positionCode} className="card mb-4">
-              <h4 className="mb-3 font-semibold text-brand-700">
+              <h4 className="mb-3 font-semibold text-brand-400">
                 {positionCode}
               </h4>
               <div className="overflow-x-auto">

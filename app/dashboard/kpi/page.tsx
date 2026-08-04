@@ -193,8 +193,8 @@ export default function KpiPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-brand-800">KPI</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-xl font-bold text-white">KPI</h2>
+        <p className="text-sm text-muted">
           Semak dan kemas kini pencapaian KPI mengikut minggu.
         </p>
       </div>
@@ -219,19 +219,19 @@ export default function KpiPage() {
             </div>
           )}
         </div>
-        {message && <p className="text-sm text-brand-700">{message}</p>}
+        {message && <p className="text-sm text-brand-400">{message}</p>}
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-500">Memuatkan...</p>
+        <p className="text-sm text-muted">Memuatkan...</p>
       ) : rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+        <div className="rounded-lg border border-dashed border-white/15 p-6 text-center text-sm text-muted">
           Tiada definisi KPI untuk jawatan pengguna ini.
         </div>
       ) : (
         grouped.map(([group, groupRows]) => (
           <div key={group} className="card">
-            <h3 className="mb-3 font-semibold text-brand-800">{group}</h3>
+            <h3 className="mb-3 font-semibold text-white">{group}</h3>
             <div className="space-y-4">
               {groupRows.map((row) => (
                 <KpiRowItem
@@ -270,10 +270,10 @@ function KpiRowItem({
   }, [row.actual, row.remark]);
 
   return (
-    <div className="grid grid-cols-1 gap-3 border-b border-gray-100 pb-4 last:border-0 last:pb-0 md:grid-cols-12 md:items-center">
+    <div className="grid grid-cols-1 gap-3 border-b border-white/10 pb-4 last:border-0 last:pb-0 md:grid-cols-12 md:items-center">
       <div className="md:col-span-4">
-        <p className="text-sm font-medium text-gray-800">{row.name}</p>
-        <p className="text-xs text-gray-400">
+        <p className="text-sm font-medium text-white">{row.name}</p>
+        <p className="text-xs text-muted">
           Sasaran: {row.target} {row.unit} · Berat: {row.weight}
         </p>
       </div>
@@ -293,7 +293,7 @@ function KpiRowItem({
             onChange={(e) => setActual(e.target.value)}
           />
         ) : (
-          <p className="text-sm text-gray-700">{row.actual ?? "-"}</p>
+          <p className="text-sm text-gray-200">{row.actual ?? "-"}</p>
         )}
       </div>
       <div className="md:col-span-2">
@@ -315,7 +315,7 @@ function KpiRowItem({
             </button>
           </div>
         ) : (
-          <p className="text-xs text-gray-500">{row.remark || "-"}</p>
+          <p className="text-xs text-muted">{row.remark || "-"}</p>
         )}
       </div>
     </div>

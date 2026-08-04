@@ -1,13 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/Sidebar";
-import type { Profile } from "@/types/database";
-
-const ROLE_LABELS: Record<string, string> = {
-  ceo: "CEO",
-  manager: "Manager",
-  member: "Ahli",
-};
+import type { Profile, Position } from "@/types/database";
 
 export default async function DashboardLayout({
   children,
@@ -34,22 +28,26 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  let positionName: string | null = null;
+  if (profile.position_code) {
+    const { data: position } = await supabase
+      .from("positions")
+      .select("*")
+      .eq("code", profile.position_code)
+      .maybeSingle<Position>();
+    positionName = position?.name ?? null;
+  }
+
   return (
-    <div className="flex min-h-screen bg-[#f9f7f1]">
-      <Sidebar role={profile.role} positionCode={profile.position_code} />
-      <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-brand-100 bg-white px-6 py-4">
-          <div>
-            <p className="text-sm text-gray-500">Selamat kembali,</p>
-            <p className="text-lg font-semibold text-brand-800">
-              {profile.full_name}
-            </p>
-          </div>
-          <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
-            {ROLE_LABELS[profile.role] ?? profile.role}
-          </span>
-        </header>
-        <main className="flex-1 p-6">{children}</main>
+    <div className="flex min-h-screen flex-col bg-[#111921] text-white lg:flex-row">
+      <Sidebar
+        role={profile.role}
+        positionCode={profile.position_code}
+        fullName={profile.full_name}
+        positionName={positionName}
+      />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

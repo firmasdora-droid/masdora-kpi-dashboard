@@ -1,11 +1,11 @@
 import type { KpiStatusColor } from "@/types/database";
 
 const BAR_COLORS: Record<KpiStatusColor, string> = {
-  hijau: "bg-green-500",
-  kuning: "bg-yellow-400",
-  oren: "bg-orange-500",
-  merah: "bg-red-500",
-  kosong: "bg-gray-300",
+  hijau: "bg-[rgb(168,188,124)]",
+  kuning: "bg-[rgb(224,197,120)]",
+  oren: "bg-[rgb(248,162,117)]",
+  merah: "bg-[rgb(232,140,140)]",
+  kosong: "bg-white/20",
 };
 
 export default function KpiProgressBar({
@@ -19,13 +19,13 @@ export default function KpiProgressBar({
 
   return (
     <div className="w-full">
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
         <div
           className={`h-full rounded-full ${BAR_COLORS[status]} transition-all`}
           style={{ width: `${width}%` }}
         />
       </div>
-      <div className="mt-0.5 text-xs text-gray-500">
+      <div className="mt-0.5 text-xs text-muted">
         {pct === null ? "-" : `${pct.toFixed(0)}%`}
       </div>
     </div>

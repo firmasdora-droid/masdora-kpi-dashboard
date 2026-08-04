@@ -5,31 +5,53 @@
 :root {
   --brand-gold: #c9a227;
   --brand-gold-dark: #a87f1e;
+  --bg-navy: #111921;
+  --bg-navy-soft: #18202a;
+  --text-primary: #f9f9fa;
+  --text-muted: #9ba1a8;
+}
+
+html,
+body {
+  background-color: var(--bg-navy);
+  color: var(--text-primary);
 }
 
 body {
-  background-color: #f9f7f1;
-  color: #2b2620;
+  font-family: var(--font-dm-sans), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
 }
 
 .card {
-  @apply rounded-xl border border-brand-200/60 bg-white p-4 shadow-sm;
+  @apply rounded-2xl border border-white/10 bg-[rgba(24,32,42,0.6)] p-4 shadow-sm backdrop-blur-md;
+}
+
+.card-sm {
+  @apply rounded-xl border border-white/10 bg-[rgba(24,32,42,0.6)] p-3 shadow-sm backdrop-blur-md;
 }
 
 .btn-primary {
-  @apply inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-[#111921] transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 .btn-secondary {
-  @apply inline-flex items-center justify-center rounded-lg border border-brand-300 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 .input {
-  @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400;
+  @apply w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.input option {
+  color: #111921;
 }
 
 .label {
-  @apply mb-1 block text-xs font-medium text-gray-600;
+  @apply mb-1 block text-xs font-medium text-muted;
 }
 
 .table-base {
@@ -37,9 +59,48 @@ body {
 }
 
 .table-base th {
-  @apply border-b border-gray-200 bg-brand-50 px-3 py-2 text-left font-semibold text-brand-800;
+  @apply border-b border-white/10 bg-white/5 px-3 py-2 text-left font-semibold text-white;
 }
 
 .table-base td {
-  @apply border-b border-gray-100 px-3 py-2;
+  @apply border-b border-white/5 px-3 py-2 text-gray-200;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+/* ---- Status pills (match KPI status colors from v_kpi_status) ---- */
+.pill {
+  @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold;
+}
+
+.pill-hijau {
+  background: rgba(107, 128, 66, 0.15);
+  color: rgb(168, 188, 124);
+  border-color: rgba(107, 128, 66, 0.4);
+}
+
+.pill-kuning {
+  background: rgba(201, 162, 39, 0.15);
+  color: rgb(224, 197, 120);
+  border-color: rgba(201, 162, 39, 0.4);
+}
+
+.pill-oren {
+  background: rgba(242, 97, 34, 0.1);
+  color: rgb(248, 162, 117);
+  border-color: rgba(242, 97, 34, 0.35);
+}
+
+.pill-merah {
+  background: rgba(200, 60, 60, 0.12);
+  color: rgb(232, 140, 140);
+  border-color: rgba(200, 60, 60, 0.4);
+}
+
+.pill-kosong {
+  background: rgba(155, 161, 168, 0.12);
+  color: rgb(155, 161, 168);
+  border-color: rgba(155, 161, 168, 0.3);
 }

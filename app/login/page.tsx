@@ -113,13 +113,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-brand-50 to-white px-4">
+    <div className="flex min-h-screen items-center justify-center bg-[#111921] px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-brand-700">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-500 text-xl font-bold text-[#111921]">
+            M
+          </div>
+          <h1 className="text-2xl font-bold text-white">
             Masdora KPI Dashboard
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-muted">
             Log masuk untuk teruskan ke dashboard anda
           </p>
         </div>
@@ -154,12 +157,12 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
                 {error}
               </p>
             )}
             {info && (
-              <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+              <p className="rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-400">
                 {info}
               </p>
             )}
@@ -175,7 +178,7 @@ export default function LoginPage() {
 
           <button
             type="button"
-            className="mt-4 w-full text-center text-xs font-medium text-brand-700 underline"
+            className="mt-4 w-full text-center text-xs font-medium text-brand-400 underline"
             onClick={() => {
               setIsFirstTime((v) => !v);
               setError(null);
@@ -188,7 +191,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <p className="mt-6 text-center text-xs text-gray-400">
+        <p className="mt-6 text-center text-xs text-muted">
           Hubungi manager anda jika menghadapi masalah log masuk.
         </p>
       </div>

@@ -77,8 +77,8 @@ export default function LeaderboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-brand-800">Leaderboard</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-xl font-bold text-white">Leaderboard</h2>
+        <p className="text-sm text-muted">
           Ranking prestasi mingguan seluruh pasukan.
         </p>
       </div>
@@ -88,11 +88,11 @@ export default function LeaderboardPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-500">Memuatkan...</p>
+        <p className="text-sm text-muted">Memuatkan...</p>
       ) : (
         <>
           <div>
-            <h3 className="mb-2 font-semibold text-brand-800">
+            <h3 className="mb-2 font-semibold text-white">
               Ranking Individu
             </h3>
             <DataTable<VLeaderboard>
@@ -103,7 +103,7 @@ export default function LeaderboardPage() {
             />
           </div>
           <div>
-            <h3 className="mb-2 font-semibold text-brand-800">
+            <h3 className="mb-2 font-semibold text-white">
               Rollup Jabatan
             </h3>
             <DataTable<VDeptSummary>

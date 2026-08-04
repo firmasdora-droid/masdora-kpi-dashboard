@@ -183,8 +183,8 @@ export default function TodosPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-brand-800">To-Do Mingguan</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-xl font-bold text-white">To-Do Mingguan</h2>
+        <p className="text-sm text-muted">
           Susun & kemas kini tugasan anda untuk minggu ini.
         </p>
       </div>
@@ -193,7 +193,7 @@ export default function TodosPage() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <WeekPicker value={week} onChange={setWeek} />
           <div className="text-right">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted">
               {submission?.submitted_at
                 ? `Dihantar pada ${new Date(submission.submitted_at).toLocaleString(
                     "ms-MY"
@@ -205,11 +205,11 @@ export default function TodosPage() {
             </button>
           </div>
         </div>
-        {message && <p className="text-sm text-brand-700">{message}</p>}
+        {message && <p className="text-sm text-brand-400">{message}</p>}
       </div>
 
       <div className="card">
-        <h3 className="mb-3 font-semibold text-brand-800">Tambah Tugasan</h3>
+        <h3 className="mb-3 font-semibold text-white">Tambah Tugasan</h3>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
           <input
             className="input md:col-span-2"
@@ -254,9 +254,9 @@ export default function TodosPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-500">Memuatkan...</p>
+        <p className="text-sm text-muted">Memuatkan...</p>
       ) : todos.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+        <div className="rounded-lg border border-dashed border-white/15 p-6 text-center text-sm text-muted">
           Tiada tugasan untuk minggu ini lagi.
         </div>
       ) : (
@@ -287,10 +287,10 @@ function TodoItem({
   const [note, setNote] = useState(todo.note ?? "");
 
   return (
-    <div className="grid grid-cols-1 gap-3 border-b border-gray-100 pb-3 last:border-0 md:grid-cols-12 md:items-center">
+    <div className="grid grid-cols-1 gap-3 border-b border-white/10 pb-3 last:border-0 md:grid-cols-12 md:items-center">
       <div className="md:col-span-3">
-        <p className="text-sm font-medium text-gray-800">{todo.title}</p>
-        <p className="text-xs text-gray-400">
+        <p className="text-sm font-medium text-white">{todo.title}</p>
+        <p className="text-xs text-muted">
           {todo.tag} · {todo.day}
         </p>
       </div>
@@ -345,7 +345,7 @@ function TodoItem({
       </div>
       <div className="md:col-span-1 text-right">
         <button
-          className="text-xs font-medium text-red-600 hover:underline"
+          className="text-xs font-medium text-red-400 hover:underline"
           onClick={() => onDelete(todo)}
         >
           Padam

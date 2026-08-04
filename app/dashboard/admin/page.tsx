@@ -24,25 +24,25 @@ export default async function AdminHubPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-brand-800">Admin</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-xl font-bold text-white">Admin</h2>
+        <p className="text-sm text-muted">
           Ruangan pengurusan pengguna & definisi KPI (khas untuk Manager).
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Link href="/dashboard/admin/users" className="card block hover:bg-brand-50">
-          <h3 className="font-semibold text-brand-800">Urus Pengguna</h3>
-          <p className="mt-1 text-sm text-gray-500">
+        <Link href="/dashboard/admin/users" className="card block hover:bg-white/5">
+          <h3 className="font-semibold text-white">Urus Pengguna</h3>
+          <p className="mt-1 text-sm text-muted">
             Lihat senarai pengguna & jemput ahli baru.
           </p>
         </Link>
         <Link
           href="/dashboard/admin/kpi-definitions"
-          className="card block hover:bg-brand-50"
+          className="card block hover:bg-white/5"
         >
-          <h3 className="font-semibold text-brand-800">Definisi KPI</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <h3 className="font-semibold text-white">Definisi KPI</h3>
+          <p className="mt-1 text-sm text-muted">
             Urus sasaran, berat, dan lulus/tolak cadangan KPI.
           </p>
         </Link>

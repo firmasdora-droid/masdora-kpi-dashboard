@@ -120,14 +120,14 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-brand-800">Urus Pengguna</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-xl font-bold text-white">Urus Pengguna</h2>
+        <p className="text-sm text-muted">
           Jemput ahli baru & lihat senarai pengguna sedia ada.
         </p>
       </div>
 
       <form onSubmit={handleCreateInvite} className="card grid grid-cols-1 gap-4 md:grid-cols-3">
-        <h3 className="font-semibold text-brand-800 md:col-span-3">
+        <h3 className="font-semibold text-white md:col-span-3">
           Jemput Ahli Baru
         </h3>
         <div>
@@ -208,7 +208,7 @@ export default function AdminUsersPage() {
           </select>
         </div>
         {message && (
-          <p className="md:col-span-3 text-sm text-red-600">{message}</p>
+          <p className="md:col-span-3 text-sm text-red-400">{message}</p>
         )}
         <div className="md:col-span-3">
           <button type="submit" className="btn-primary">
@@ -218,20 +218,20 @@ export default function AdminUsersPage() {
       </form>
 
       {generated && (
-        <div className="card border-2 border-brand-400 bg-brand-50">
-          <p className="text-sm font-semibold text-brand-800">
+        <div className="card border-2 border-brand-400 bg-white/5">
+          <p className="text-sm font-semibold text-white">
             Jemputan berjaya dicipta untuk {generated.email}
           </p>
-          <p className="mt-2 text-sm text-gray-700">
+          <p className="mt-2 text-sm text-gray-200">
             Kod: <span className="font-mono font-bold">{generated.code}</span>
           </p>
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-gray-200">
             Kata Laluan Sementara:{" "}
             <span className="font-mono font-bold">
               {generated.temp_password}
             </span>
           </p>
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-muted">
             Sila salin & kongsi maklumat ini secara manual kepada ahli
             berkenaan. Ia tidak akan dipaparkan lagi selepas ini. Ahli perlu
             gunakan emel ini semasa "Kali pertama log masuk" di halaman log
@@ -241,11 +241,11 @@ export default function AdminUsersPage() {
       )}
 
       <div>
-        <h3 className="mb-2 font-semibold text-brand-800">
+        <h3 className="mb-2 font-semibold text-white">
           Jemputan Belum Digunakan
         </h3>
         {invites.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+          <div className="rounded-lg border border-dashed border-white/15 p-6 text-center text-sm text-muted">
             Tiada jemputan menunggu.
           </div>
         ) : (
@@ -277,11 +277,11 @@ export default function AdminUsersPage() {
       </div>
 
       <div>
-        <h3 className="mb-2 font-semibold text-brand-800">
+        <h3 className="mb-2 font-semibold text-white">
           Senarai Pengguna
         </h3>
         {loading ? (
-          <p className="text-sm text-gray-500">Memuatkan...</p>
+          <p className="text-sm text-muted">Memuatkan...</p>
         ) : (
           <div className="card overflow-x-auto">
             <table className="table-base">

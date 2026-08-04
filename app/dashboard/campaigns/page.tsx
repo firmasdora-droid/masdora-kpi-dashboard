@@ -137,8 +137,8 @@ export default function CampaignsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-brand-800">Kempen</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-xl font-bold text-white">Kempen</h2>
+        <p className="text-sm text-muted">
           Senarai kempen pemasaran bulanan.
         </p>
       </div>
@@ -171,7 +171,7 @@ export default function CampaignsPage() {
 
       {canManage && (
         <form onSubmit={handleSubmit} className="card grid grid-cols-1 gap-4 md:grid-cols-3">
-          <h3 className="font-semibold text-brand-800 md:col-span-3">
+          <h3 className="font-semibold text-white md:col-span-3">
             {editingId ? "Kemas kini Kempen" : "Tambah Kempen"}
           </h3>
           <div className="md:col-span-2">
@@ -252,7 +252,7 @@ export default function CampaignsPage() {
             />
           </div>
           {message && (
-            <p className="md:col-span-3 text-sm text-brand-700">{message}</p>
+            <p className="md:col-span-3 text-sm text-brand-400">{message}</p>
           )}
           <div className="flex gap-2 md:col-span-3">
             <button type="submit" className="btn-primary">
@@ -272,9 +272,9 @@ export default function CampaignsPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-gray-500">Memuatkan...</p>
+        <p className="text-sm text-muted">Memuatkan...</p>
       ) : campaigns.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+        <div className="rounded-lg border border-dashed border-white/15 p-6 text-center text-sm text-muted">
           Tiada kempen untuk bulan ini.
         </div>
       ) : (
@@ -283,28 +283,28 @@ export default function CampaignsPage() {
             <div key={c.id} className="card">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="font-semibold text-brand-800">{c.name}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="font-semibold text-white">{c.name}</p>
+                  <p className="text-xs text-muted">
                     {c.type} · {c.status}
                   </p>
                 </div>
-                <span className="text-sm font-bold text-brand-700">
+                <span className="text-sm font-bold text-brand-400">
                   {c.progress}%
                 </span>
               </div>
               {c.notes && (
-                <p className="mt-2 text-sm text-gray-600">{c.notes}</p>
+                <p className="mt-2 text-sm text-gray-300">{c.notes}</p>
               )}
               {canManage && (
                 <div className="mt-3 flex gap-3">
                   <button
-                    className="text-xs font-medium text-brand-700 hover:underline"
+                    className="text-xs font-medium text-brand-400 hover:underline"
                     onClick={() => startEdit(c)}
                   >
                     Edit
                   </button>
                   <button
-                    className="text-xs font-medium text-red-600 hover:underline"
+                    className="text-xs font-medium text-red-400 hover:underline"
                     onClick={() => handleDelete(c.id)}
                   >
                     Padam
