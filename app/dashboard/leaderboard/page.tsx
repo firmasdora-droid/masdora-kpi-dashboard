@@ -11,6 +11,7 @@ import {
 import WeekPicker, { WeekValue } from "@/components/WeekPicker";
 import DataTable, { DataTableColumn } from "@/components/DataTable";
 import AvatarInitials from "@/components/AvatarInitials";
+import RankBarChart, { RankBarItem } from "@/components/charts/RankBarChart";
 import type {
   VDeptSummary,
   VLeaderboard,
@@ -148,6 +149,23 @@ function KpiLeaderboard() {
         <>
           <div>
             <h3 className="mb-2 font-semibold text-white">
+              Carta Ranking
+            </h3>
+            <RankBarChart
+              items={rows.map(
+                (r): RankBarItem => ({
+                  id: r.user_id,
+                  rank: r.rank,
+                  name: r.full_name,
+                  deptCode: r.dept_code,
+                  value: r.total_score ?? 0,
+                  valueLabel: String(r.total_score ?? 0),
+                })
+              )}
+            />
+          </div>
+          <div>
+            <h3 className="mb-2 font-semibold text-white">
               Ranking Individu
             </h3>
             <DataTable<VLeaderboard>
@@ -266,12 +284,26 @@ function SalesDaily() {
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : (
-        <DataTable<VSalesRankDaily>
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => r.user_id}
-          emptyMessage="Tiada data jualan untuk tarikh ini."
-        />
+        <>
+          <RankBarChart
+            items={rows.map(
+              (r): RankBarItem => ({
+                id: r.user_id,
+                rank: r.rank,
+                name: r.full_name,
+                deptCode: r.dept_code,
+                value: r.total_rm ?? 0,
+                valueLabel: formatRM(r.total_rm),
+              })
+            )}
+          />
+          <DataTable<VSalesRankDaily>
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.user_id}
+            emptyMessage="Tiada data jualan untuk tarikh ini."
+          />
+        </>
       )}
     </div>
   );
@@ -333,12 +365,26 @@ function SalesWeekly() {
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : (
-        <DataTable<VSalesRankWeekly>
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => r.user_id}
-          emptyMessage="Tiada data jualan untuk minggu ini."
-        />
+        <>
+          <RankBarChart
+            items={rows.map(
+              (r): RankBarItem => ({
+                id: r.user_id,
+                rank: r.rank,
+                name: r.full_name,
+                deptCode: r.dept_code,
+                value: r.total_rm ?? 0,
+                valueLabel: formatRM(r.total_rm),
+              })
+            )}
+          />
+          <DataTable<VSalesRankWeekly>
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.user_id}
+            emptyMessage="Tiada data jualan untuk minggu ini."
+          />
+        </>
       )}
     </div>
   );
@@ -438,12 +484,26 @@ function SalesMonthly() {
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : (
-        <DataTable<VSalesRankMonthly>
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => r.user_id}
-          emptyMessage="Tiada data jualan untuk bulan ini."
-        />
+        <>
+          <RankBarChart
+            items={rows.map(
+              (r): RankBarItem => ({
+                id: r.user_id,
+                rank: r.rank,
+                name: r.full_name,
+                deptCode: r.dept_code,
+                value: r.total_rm ?? 0,
+                valueLabel: formatRM(r.total_rm),
+              })
+            )}
+          />
+          <DataTable<VSalesRankMonthly>
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.user_id}
+            emptyMessage="Tiada data jualan untuk bulan ini."
+          />
+        </>
       )}
     </div>
   );
