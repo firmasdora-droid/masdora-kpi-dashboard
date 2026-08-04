@@ -110,6 +110,7 @@ export default function SalesPage() {
 
   const eligible =
     !!profile && canKeyInSale(profile.role as Role, profile.position_code);
+  const showLiveFields = profile?.position_code === "VID_PROD";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -220,75 +221,81 @@ export default function SalesPage() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="label">Team</label>
-            <select
-              className="input"
-              value={form.team}
-              onChange={(e) => setForm({ ...form, team: e.target.value })}
-            >
-              <option value="">- Pilih -</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.name}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Host Name</label>
-            <select
-              className="input"
-              value={form.host_name}
-              onChange={(e) => setForm({ ...form, host_name: e.target.value })}
-            >
-              <option value="">- Pilih -</option>
-              {hosts.map((h) => (
-                <option key={h.id} value={h.name}>
-                  {h.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Live Account</label>
-            <select
-              className="input"
-              value={form.live_account}
-              onChange={(e) =>
-                setForm({ ...form, live_account: e.target.value })
-              }
-            >
-              <option value="">- Pilih -</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.name}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Mula Sesi</label>
-            <input
-              type="time"
-              className="input"
-              value={form.session_start}
-              onChange={(e) =>
-                setForm({ ...form, session_start: e.target.value })
-              }
-            />
-          </div>
-          <div>
-            <label className="label">Tamat Sesi</label>
-            <input
-              type="time"
-              className="input"
-              value={form.session_end}
-              onChange={(e) =>
-                setForm({ ...form, session_end: e.target.value })
-              }
-            />
-          </div>
+          {showLiveFields && (
+            <>
+              <div>
+                <label className="label">Team</label>
+                <select
+                  className="input"
+                  value={form.team}
+                  onChange={(e) => setForm({ ...form, team: e.target.value })}
+                >
+                  <option value="">- Pilih -</option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Host Name</label>
+                <select
+                  className="input"
+                  value={form.host_name}
+                  onChange={(e) =>
+                    setForm({ ...form, host_name: e.target.value })
+                  }
+                >
+                  <option value="">- Pilih -</option>
+                  {hosts.map((h) => (
+                    <option key={h.id} value={h.name}>
+                      {h.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Live Account</label>
+                <select
+                  className="input"
+                  value={form.live_account}
+                  onChange={(e) =>
+                    setForm({ ...form, live_account: e.target.value })
+                  }
+                >
+                  <option value="">- Pilih -</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.name}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Mula Sesi</label>
+                <input
+                  type="time"
+                  className="input"
+                  value={form.session_start}
+                  onChange={(e) =>
+                    setForm({ ...form, session_start: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label">Tamat Sesi</label>
+                <input
+                  type="time"
+                  className="input"
+                  value={form.session_end}
+                  onChange={(e) =>
+                    setForm({ ...form, session_end: e.target.value })
+                  }
+                />
+              </div>
+            </>
+          )}
           <div className="md:col-span-3">
             <label className="label">Catatan</label>
             <input
