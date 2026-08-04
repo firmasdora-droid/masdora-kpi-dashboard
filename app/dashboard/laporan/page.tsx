@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
   getCurrentYear,
@@ -11,6 +12,12 @@ import {
 import WeekPicker, { WeekValue } from "@/components/WeekPicker";
 import DataTable, { DataTableColumn } from "@/components/DataTable";
 import type { Department, VDeptSummary, VWeeklyScore } from "@/types/database";
+
+const cardMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 export default function LaporanPage() {
   const supabase = createClient();
@@ -94,9 +101,9 @@ export default function LaporanPage() {
         </button>
       </div>
 
-      <div className="card">
+      <motion.div {...cardMotion} className="card">
         <WeekPicker value={week} onChange={setWeek} />
-      </div>
+      </motion.div>
 
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>

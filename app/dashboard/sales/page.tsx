@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentYear, getCurrentMonth, monthName } from "@/lib/period";
 import { canKeyInSale, isManager, isCeo, type Role } from "@/lib/roles";
@@ -19,6 +20,12 @@ const PLATFORMS: SalePlatform[] = [
   "web",
   "walkin",
 ];
+
+const cardMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 interface MonthlyRow extends VSalesMonthly {
   full_name?: string;
@@ -182,7 +189,11 @@ export default function SalesPage() {
       </div>
 
       {eligible ? (
-        <form onSubmit={handleSubmit} className="card grid grid-cols-1 gap-4 md:grid-cols-3">
+        <motion.form
+          {...cardMotion}
+          onSubmit={handleSubmit}
+          className="card grid grid-cols-1 gap-4 md:grid-cols-3"
+        >
           <div>
             <label className="label">Tarikh</label>
             <input
@@ -312,13 +323,13 @@ export default function SalesPage() {
               {saving ? "Menyimpan..." : "Simpan Jualan"}
             </button>
           </div>
-        </form>
+        </motion.form>
       ) : (
-        <div className="card text-sm text-gray-300">
+        <motion.div {...cardMotion} className="card text-sm text-gray-300">
           Jawatan anda tidak layak untuk key-in jualan. Hanya CS Web, CS
           Shopee, CS TikTok, Videographer Produk & Shopee, dan Manager yang
           boleh merekod jualan.
-        </div>
+        </motion.div>
       )}
 
       <div>

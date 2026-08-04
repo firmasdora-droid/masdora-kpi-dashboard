@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
   getCurrentYear,
@@ -32,6 +33,12 @@ import type {
 } from "@/types/database";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
+
+const cardMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 function scoreStatusLabel(score: number | null): {
   label: string;
@@ -336,7 +343,7 @@ export default function DashboardUtama() {
         </p>
       </div>
 
-      <div className="card flex flex-wrap items-end gap-4">
+      <motion.div {...cardMotion} className="card flex flex-wrap items-end gap-4">
         <div>
           <label className="label">Tahun</label>
           <select className="input" value={year} onChange={(e) => setYear(Number(e.target.value))}>
@@ -382,7 +389,7 @@ export default function DashboardUtama() {
             ))}
           </select>
         </div>
-      </div>
+      </motion.div>
 
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
@@ -435,38 +442,46 @@ export default function DashboardUtama() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="card">
+            <motion.div {...cardMotion} className="card">
               <h3 className="mb-3 font-semibold text-white">
                 Prestasi Mengikut Jabatan
               </h3>
               <BarChart data={barData} />
-            </div>
-            <div className="card flex flex-col items-center justify-center">
+            </motion.div>
+            <motion.div
+              {...cardMotion}
+              transition={{ ...cardMotion.transition, delay: 0.06 }}
+              className="card flex flex-col items-center justify-center"
+            >
               <h3 className="mb-3 self-start font-semibold text-white">
                 Pencapaian Minggu {week}
               </h3>
               <DonutChart pct={overallScore ?? 0} />
-            </div>
+            </motion.div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="card">
+            <motion.div {...cardMotion} className="card">
               <h3 className="mb-3 font-semibold text-white">Trend Mingguan</h3>
               <LineChart series={lineSeries} />
-            </div>
-            <div className="card">
+            </motion.div>
+            <motion.div
+              {...cardMotion}
+              transition={{ ...cardMotion.transition, delay: 0.06 }}
+              className="card"
+            >
               <h3 className="mb-3 font-semibold text-white">Peta Prestasi</h3>
               <RadarChart data={radarData} />
-            </div>
+            </motion.div>
           </div>
 
           <div>
             <h3 className="mb-2 font-semibold text-white">Ringkasan Jabatan</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filteredDeptSummary.length === 0 ? (
-                <div className="card text-sm text-muted">
+                <motion.div {...cardMotion} className="card text-sm text-muted">
                   Tiada data jabatan untuk tempoh ini.
-                </div>
+                </motion.div>
               ) : (
                 filteredDeptSummary.map((d, i) => {
                   const dept = departments.find((x) => x.code === d.dept_code);
@@ -476,10 +491,16 @@ export default function DashboardUtama() {
                   );
                   const onTime = deptSubs.filter((s) => s.on_time).length;
                   return (
-                    <div
+                    <motion.div
                       key={d.dept_code ?? "-"}
-                      className="card card-hover animate-rise flex items-center gap-3"
-                      style={{ animationDelay: `${i * 50}ms` }}
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: 0.45,
+                        delay: i * 0.06,
+                        ease: [0.4, 0, 0.2, 1],
+                      }}
+                      className="card card-hover flex items-center gap-3"
                     >
                       <span
                         className="h-8 w-1.5 flex-shrink-0 rounded-full"
@@ -503,7 +524,7 @@ export default function DashboardUtama() {
                           <StatusBadge status={status.pill} />
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })
               )}
@@ -513,16 +534,22 @@ export default function DashboardUtama() {
           <div>
             <h3 className="mb-2 font-semibold text-white">Kempen Bulanan</h3>
             {campaigns.length === 0 ? (
-              <div className="card text-sm text-muted">
+              <motion.div {...cardMotion} className="card text-sm text-muted">
                 Tiada kempen untuk bulan ini.
-              </div>
+              </motion.div>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {campaigns.map((c, i) => (
-                  <div
+                  <motion.div
                     key={c.id}
-                    className="card card-hover animate-rise"
-                    style={{ animationDelay: `${i * 50}ms` }}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.45,
+                      delay: i * 0.06,
+                      ease: [0.4, 0, 0.2, 1],
+                    }}
+                    className="card card-hover"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-bold text-slate-100">{c.name}</p>
@@ -537,7 +564,7 @@ export default function DashboardUtama() {
                     <p className="mt-1 text-xs text-slate-400">
                       {c.progress}% · {c.status}
                     </p>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             )}
@@ -546,14 +573,21 @@ export default function DashboardUtama() {
           <div>
             <h3 className="mb-2 font-semibold text-white">Leaderboard Pantas</h3>
             {leaderboard.length === 0 ? (
-              <div className="card text-sm text-muted">
+              <motion.div {...cardMotion} className="card text-sm text-muted">
                 Tiada data leaderboard untuk tempoh ini.
-              </div>
+              </motion.div>
             ) : (
               <div className="card divide-y divide-white/5">
                 {leaderboard.slice(0, 3).map((row, i) => (
-                  <div
+                  <motion.div
                     key={row.user_id}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.45,
+                      delay: i * 0.06,
+                      ease: [0.4, 0, 0.2, 1],
+                    }}
                     className="flex items-center gap-3 rounded-lg px-2 py-2 transition first:pt-2 last:pb-2 hover:bg-white/5"
                   >
                     <span className="w-6 text-lg">{MEDALS[i] ?? `#${row.rank}`}</span>
@@ -573,7 +607,7 @@ export default function DashboardUtama() {
                     <span className="text-sm font-bold text-brand-400">
                       {row.total_score}
                     </span>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             )}
@@ -586,7 +620,7 @@ export default function DashboardUtama() {
                 Halaman To-Do →
               </Link>
             </div>
-            <div className="card overflow-x-auto">
+            <motion.div {...cardMotion} className="card overflow-x-auto">
               <table className="table-base">
                 <thead>
                   <tr>
@@ -605,14 +639,23 @@ export default function DashboardUtama() {
                       </td>
                     </tr>
                   ) : (
-                    todoTableRows.map(({ profile, summary }) => {
+                    todoTableRows.map(({ profile, summary }, i) => {
                       const status: KpiStatusColor = !summary?.submitted_at
                         ? "kosong"
                         : summary.on_time
                         ? "hijau"
                         : "oren";
                       return (
-                        <tr key={profile.id}>
+                        <motion.tr
+                          key={profile.id}
+                          initial={{ opacity: 0, y: 14 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{
+                            duration: 0.45,
+                            delay: i * 0.06,
+                            ease: [0.4, 0, 0.2, 1],
+                          }}
+                        >
                           <td>
                             <div className="flex items-center gap-2">
                               <AvatarInitials
@@ -641,13 +684,13 @@ export default function DashboardUtama() {
                                 : "Lewat"}
                             </span>
                           </td>
-                        </tr>
+                        </motion.tr>
                       );
                     })
                   )}
                 </tbody>
               </table>
-            </div>
+            </motion.div>
           </div>
         </>
       )}
@@ -681,9 +724,15 @@ function StatCard({
 }) {
   const accent = STAT_ACCENTS[index % STAT_ACCENTS.length];
   return (
-    <div
-      className={`animate-rise rounded-2xl border bg-gradient-to-br p-4 ${accent}`}
-      style={{ animationDelay: `${index * 60}ms` }}
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.45,
+        delay: index * 0.06,
+        ease: [0.4, 0, 0.2, 1],
+      }}
+      className={`rounded-2xl border bg-gradient-to-br p-4 ${accent}`}
     >
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
@@ -699,6 +748,6 @@ function StatCard({
       ) : (
         <p className="mt-1 text-[11px] text-slate-400">{caption}</p>
       )}
-    </div>
+    </motion.div>
   );
 }

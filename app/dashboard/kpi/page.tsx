@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
   getCurrentYear,
@@ -17,6 +18,12 @@ import type {
   Profile,
   VKpiStatus,
 } from "@/types/database";
+
+const cardMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 interface KpiRow {
   kpi_id: string;
@@ -199,7 +206,7 @@ export default function KpiPage() {
         </p>
       </div>
 
-      <div className="card space-y-4">
+      <motion.div {...cardMotion} className="card space-y-4">
         <div className="flex flex-wrap items-end gap-4">
           <WeekPicker value={week} onChange={setWeek} />
           {meProfile && (isManager(meProfile.role) || isCeo(meProfile.role)) && (
@@ -220,7 +227,7 @@ export default function KpiPage() {
           )}
         </div>
         {message && <p className="text-sm text-brand-400">{message}</p>}
-      </div>
+      </motion.div>
 
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
@@ -229,8 +236,14 @@ export default function KpiPage() {
           Tiada definisi KPI untuk jawatan pengguna ini.
         </div>
       ) : (
-        grouped.map(([group, groupRows]) => (
-          <div key={group} className="card">
+        grouped.map(([group, groupRows], i) => (
+          <motion.div
+            key={group}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: i * 0.06, ease: [0.4, 0, 0.2, 1] }}
+            className="card"
+          >
             <h3 className="mb-3 font-semibold text-white">{group}</h3>
             <div className="space-y-4">
               {groupRows.map((row) => (
@@ -243,7 +256,7 @@ export default function KpiPage() {
                 />
               ))}
             </div>
-          </div>
+          </motion.div>
         ))
       )}
     </div>

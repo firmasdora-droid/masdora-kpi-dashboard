@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
   getCurrentYear,
@@ -28,6 +29,12 @@ interface DraftTodo {
   note: string;
   day: string;
 }
+
+const cardMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 const EMPTY_DRAFT: DraftTodo = {
   title: "",
@@ -189,7 +196,7 @@ export default function TodosPage() {
         </p>
       </div>
 
-      <div className="card space-y-4">
+      <motion.div {...cardMotion} className="card space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <WeekPicker value={week} onChange={setWeek} />
           <div className="text-right">
@@ -206,9 +213,9 @@ export default function TodosPage() {
           </div>
         </div>
         {message && <p className="text-sm text-brand-400">{message}</p>}
-      </div>
+      </motion.div>
 
-      <div className="card">
+      <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.06 }} className="card">
         <h3 className="mb-3 font-semibold text-white">Tambah Tugasan</h3>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
           <input
@@ -251,7 +258,7 @@ export default function TodosPage() {
             Tambah
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
@@ -261,9 +268,10 @@ export default function TodosPage() {
         </div>
       ) : (
         <div className="card space-y-3">
-          {todos.map((todo) => (
+          {todos.map((todo, i) => (
             <TodoItem
               key={todo.id}
+              index={i}
               todo={todo}
               onUpdate={handleUpdate}
               onDelete={handleDelete}
@@ -277,17 +285,24 @@ export default function TodosPage() {
 
 function TodoItem({
   todo,
+  index = 0,
   onUpdate,
   onDelete,
 }: {
   todo: Todo;
+  index?: number;
   onUpdate: (todo: Todo, patch: Partial<Todo>) => void;
   onDelete: (todo: Todo) => void;
 }) {
   const [note, setNote] = useState(todo.note ?? "");
 
   return (
-    <div className="grid grid-cols-1 gap-3 border-b border-white/10 pb-3 last:border-0 md:grid-cols-12 md:items-center">
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, delay: index * 0.06, ease: [0.4, 0, 0.2, 1] }}
+      className="grid grid-cols-1 gap-3 border-b border-white/10 pb-3 last:border-0 md:grid-cols-12 md:items-center"
+    >
       <div className="md:col-span-3">
         <p className="text-sm font-medium text-white">{todo.title}</p>
         <p className="text-xs text-muted">
@@ -351,6 +366,6 @@ function TodoItem({
           Padam
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }

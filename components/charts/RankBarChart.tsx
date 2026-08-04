@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import AvatarInitials from "@/components/AvatarInitials";
 
 export interface RankBarItem {
@@ -32,7 +33,14 @@ export default function RankBarChart({ items }: { items: RankBarItem[] }) {
 
   if (items.length === 0) {
     return (
-      <div className="card text-sm text-muted">Tiada data untuk tempoh ini.</div>
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+        className="card text-sm text-muted"
+      >
+        Tiada data untuk tempoh ini.
+      </motion.div>
     );
   }
 
@@ -46,10 +54,15 @@ export default function RankBarChart({ items }: { items: RankBarItem[] }) {
             item.deptColor ?? "#C9A227"
           }99)`;
         return (
-          <div
+          <motion.div
             key={item.id}
-            className="animate-rise"
-            style={{ animationDelay: `${i * 60}ms` }}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.45,
+              delay: i * 0.06,
+              ease: [0.4, 0, 0.2, 1],
+            }}
           >
             <div className="mb-1 flex items-center gap-2">
               <span className="w-7 flex-shrink-0 text-center text-sm">
@@ -81,7 +94,7 @@ export default function RankBarChart({ items }: { items: RankBarItem[] }) {
                 }}
               />
             </div>
-          </div>
+          </motion.div>
         );
       })}
     </div>

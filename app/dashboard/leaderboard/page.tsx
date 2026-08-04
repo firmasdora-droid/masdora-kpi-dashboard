@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
   getCurrentYear,
@@ -21,6 +22,12 @@ import type {
 } from "@/types/database";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
+
+const cardMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 function formatRM(n: number | null | undefined): string {
   if (n === null || n === undefined) return "-";
@@ -139,9 +146,9 @@ function KpiLeaderboard() {
 
   return (
     <div className="space-y-6">
-      <div className="card">
+      <motion.div {...cardMotion} className="card">
         <WeekPicker value={week} onChange={setWeek} />
-      </div>
+      </motion.div>
 
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
@@ -272,7 +279,7 @@ function SalesDaily() {
 
   return (
     <div className="space-y-6">
-      <div className="card">
+      <motion.div {...cardMotion} className="card">
         <label className="label">Tarikh</label>
         <input
           type="date"
@@ -280,7 +287,7 @@ function SalesDaily() {
           value={date}
           onChange={(e) => setDate(e.target.value)}
         />
-      </div>
+      </motion.div>
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : (
@@ -359,9 +366,9 @@ function SalesWeekly() {
 
   return (
     <div className="space-y-6">
-      <div className="card">
+      <motion.div {...cardMotion} className="card">
         <WeekPicker value={week} onChange={setWeek} />
-      </div>
+      </motion.div>
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : (
@@ -451,7 +458,7 @@ function SalesMonthly() {
 
   return (
     <div className="space-y-6">
-      <div className="card flex flex-wrap items-end gap-4">
+      <motion.div {...cardMotion} className="card flex flex-wrap items-end gap-4">
         <div>
           <label className="label">Tahun</label>
           <select
@@ -480,7 +487,7 @@ function SalesMonthly() {
             ))}
           </select>
         </div>
-      </div>
+      </motion.div>
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : (

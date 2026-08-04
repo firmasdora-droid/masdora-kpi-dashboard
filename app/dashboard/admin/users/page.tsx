@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import type {
   Department,
@@ -30,6 +31,12 @@ function randomPassword(length = 10): string {
   }
   return out;
 }
+
+const cardMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 const EMPTY_FORM = {
   name: "",
@@ -126,7 +133,11 @@ export default function AdminUsersPage() {
         </p>
       </div>
 
-      <form onSubmit={handleCreateInvite} className="card grid grid-cols-1 gap-4 md:grid-cols-3">
+      <motion.form
+        {...cardMotion}
+        onSubmit={handleCreateInvite}
+        className="card grid grid-cols-1 gap-4 md:grid-cols-3"
+      >
         <h3 className="font-semibold text-white md:col-span-3">
           Jemput Ahli Baru
         </h3>
@@ -215,10 +226,13 @@ export default function AdminUsersPage() {
             Cipta Jemputan
           </button>
         </div>
-      </form>
+      </motion.form>
 
       {generated && (
-        <div className="card border-2 border-brand-400 bg-white/5">
+        <motion.div
+          {...cardMotion}
+          className="card border-2 border-brand-400 bg-white/5"
+        >
           <p className="text-sm font-semibold text-white">
             Jemputan berjaya dicipta untuk {generated.email}
           </p>
@@ -237,7 +251,7 @@ export default function AdminUsersPage() {
             gunakan emel ini semasa "Kali pertama log masuk" di halaman log
             masuk.
           </p>
-        </div>
+        </motion.div>
       )}
 
       <div>
@@ -249,7 +263,7 @@ export default function AdminUsersPage() {
             Tiada jemputan menunggu.
           </div>
         ) : (
-          <div className="card overflow-x-auto">
+          <motion.div {...cardMotion} className="card overflow-x-auto">
             <table className="table-base">
               <thead>
                 <tr>
@@ -272,7 +286,7 @@ export default function AdminUsersPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </motion.div>
         )}
       </div>
 
@@ -283,7 +297,7 @@ export default function AdminUsersPage() {
         {loading ? (
           <p className="text-sm text-muted">Memuatkan...</p>
         ) : (
-          <div className="card overflow-x-auto">
+          <motion.div {...cardMotion} className="card overflow-x-auto">
             <table className="table-base">
               <thead>
                 <tr>
@@ -308,7 +322,7 @@ export default function AdminUsersPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </motion.div>
         )}
       </div>
     </div>

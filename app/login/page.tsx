@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import MasdoraLogomark from "@/components/MasdoraLogomark";
 import MasdoraWordmark from "@/components/MasdoraWordmark";
@@ -129,7 +130,12 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="card">
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+          className="card"
+        >
           <form
             onSubmit={isFirstTime ? handleFirstTimeSignup : handleSignIn}
             className="space-y-4"
@@ -191,7 +197,7 @@ export default function LoginPage() {
               ? "Sudah ada akaun? Log masuk"
               : "Kali pertama log masuk (guna invite)"}
           </button>
-        </div>
+        </motion.div>
 
         <p className="mt-6 text-center text-xs text-muted">
           Hubungi manager anda jika menghadapi masalah log masuk.

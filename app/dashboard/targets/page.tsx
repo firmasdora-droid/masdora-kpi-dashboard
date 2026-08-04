@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
   getCurrentYear,
@@ -11,6 +12,12 @@ import {
 import WeekPicker, { WeekValue } from "@/components/WeekPicker";
 import { SALE_ELIGIBLE_POSITIONS } from "@/lib/roles";
 import type { KpiDefinition, KpiTarget, Profile, SalesTarget } from "@/types/database";
+
+const cardMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 interface TargetRow {
   kpi_id: string;
@@ -211,7 +218,7 @@ export default function TargetsPage() {
         </p>
       </div>
 
-      <div className="card space-y-4">
+      <motion.div {...cardMotion} className="card space-y-4">
         <div className="flex flex-wrap items-end gap-4">
           <WeekPicker value={week} onChange={setWeek} />
           <div>
@@ -230,16 +237,16 @@ export default function TargetsPage() {
           </div>
         </div>
         {message && <p className="text-sm text-brand-400">{message}</p>}
-      </div>
+      </motion.div>
 
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : rows.length === 0 ? (
-        <div className="card text-center text-sm text-muted">
+        <motion.div {...cardMotion} className="card text-center text-sm text-muted">
           Tiada definisi KPI untuk jawatan pengguna ini.
-        </div>
+        </motion.div>
       ) : (
-        <div className="card overflow-x-auto">
+        <motion.div {...cardMotion} className="card overflow-x-auto">
           <table className="table-base">
             <thead>
               <tr>
@@ -261,7 +268,7 @@ export default function TargetsPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </motion.div>
       )}
 
       {saleEligible && (
@@ -269,7 +276,7 @@ export default function TargetsPage() {
           <h3 className="mb-2 font-semibold text-white">
             Sasaran Jualan Bulanan
           </h3>
-          <div className="card flex flex-wrap items-end gap-4">
+          <motion.div {...cardMotion} className="card flex flex-wrap items-end gap-4">
             <div>
               <label className="label">Sasaran (RM) — {monthName(week.month)} {week.year}</label>
               <input
@@ -291,7 +298,7 @@ export default function TargetsPage() {
             {salesMessage && (
               <p className="w-full text-sm text-brand-400">{salesMessage}</p>
             )}
-          </div>
+          </motion.div>
         </div>
       )}
     </div>

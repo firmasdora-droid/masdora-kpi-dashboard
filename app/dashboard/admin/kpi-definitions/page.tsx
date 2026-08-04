@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import type {
   KpiDefinition,
@@ -9,6 +10,12 @@ import type {
 } from "@/types/database";
 
 const DIRECTIONS: KpiDirection[] = ["up", "down"];
+
+const cardMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 export default function KpiDefinitionsPage() {
   const supabase = createClient();
@@ -129,8 +136,14 @@ export default function KpiDefinitionsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {pending.map((p) => (
-              <div key={p.id} className="card">
+            {pending.map((p, i) => (
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, delay: i * 0.06, ease: [0.4, 0, 0.2, 1] }}
+                className="card"
+              >
                 <p className="font-semibold text-white">
                   {p.name} ({p.id}) - {p.position_code}
                 </p>
@@ -168,7 +181,7 @@ export default function KpiDefinitionsPage() {
                     Tolak
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}
@@ -181,8 +194,14 @@ export default function KpiDefinitionsPage() {
         {loading ? (
           <p className="text-sm text-muted">Memuatkan...</p>
         ) : (
-          grouped.map(([positionCode, defs]) => (
-            <div key={positionCode} className="card mb-4">
+          grouped.map(([positionCode, defs], i) => (
+            <motion.div
+              key={positionCode}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: i * 0.06, ease: [0.4, 0, 0.2, 1] }}
+              className="card mb-4"
+            >
               <h4 className="mb-3 font-semibold text-brand-400">
                 {positionCode}
               </h4>
@@ -262,7 +281,7 @@ export default function KpiDefinitionsPage() {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </motion.div>
           ))
         )}
       </div>

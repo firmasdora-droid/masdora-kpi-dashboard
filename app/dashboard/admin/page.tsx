@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import AdminNavCard from "@/components/dashboard/AdminNavCard";
 import type { Profile } from "@/types/database";
 
 export default async function AdminHubPage() {
@@ -31,21 +31,18 @@ export default async function AdminHubPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Link href="/dashboard/admin/users" className="card block hover:bg-white/5">
-          <h3 className="font-semibold text-white">Urus Pengguna</h3>
-          <p className="mt-1 text-sm text-muted">
-            Lihat senarai pengguna & jemput ahli baru.
-          </p>
-        </Link>
-        <Link
+        <AdminNavCard
+          index={0}
+          href="/dashboard/admin/users"
+          title="Urus Pengguna"
+          description="Lihat senarai pengguna & jemput ahli baru."
+        />
+        <AdminNavCard
+          index={1}
           href="/dashboard/admin/kpi-definitions"
-          className="card block hover:bg-white/5"
-        >
-          <h3 className="font-semibold text-white">Definisi KPI</h3>
-          <p className="mt-1 text-sm text-muted">
-            Urus sasaran, berat, dan lulus/tolak cadangan KPI.
-          </p>
-        </Link>
+          title="Definisi KPI"
+          description="Urus sasaran, berat, dan lulus/tolak cadangan KPI."
+        />
       </div>
     </div>
   );

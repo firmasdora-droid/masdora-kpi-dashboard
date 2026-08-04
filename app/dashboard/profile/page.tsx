@@ -1,9 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import AvatarInitials from "@/components/AvatarInitials";
 import type { Department, Position, Profile } from "@/types/database";
+
+const cardMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 const ROLE_LABELS: Record<string, string> = {
   ceo: "CEO",
@@ -116,7 +123,7 @@ export default function ProfilePage() {
         </p>
       </div>
 
-      <div className="card flex items-center gap-4">
+      <motion.div {...cardMotion} className="card flex items-center gap-4">
         {form.photo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -136,9 +143,14 @@ export default function ProfilePage() {
           </p>
           <p className="text-xs text-muted">{profile.email}</p>
         </div>
-      </div>
+      </motion.div>
 
-      <form onSubmit={handleSave} className="card grid grid-cols-1 gap-4 md:grid-cols-2">
+      <motion.form
+        {...cardMotion}
+        transition={{ ...cardMotion.transition, delay: 0.06 }}
+        onSubmit={handleSave}
+        className="card grid grid-cols-1 gap-4 md:grid-cols-2"
+      >
         <h3 className="font-semibold text-white md:col-span-2">
           Kemas Kini Maklumat
         </h3>
@@ -187,7 +199,7 @@ export default function ProfilePage() {
             {saving ? "Menyimpan..." : "Simpan Perubahan"}
           </button>
         </div>
-      </form>
+      </motion.form>
     </div>
   );
 }

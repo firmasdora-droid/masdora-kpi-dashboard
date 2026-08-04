@@ -1,29 +1,34 @@
+"use client";
+
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart as RLineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { SeriesDatum } from "./types";
+
+const tooltipContentStyle: React.CSSProperties = {
+  background: "#0f172acc",
+  border: "1px solid rgba(255,255,255,.1)",
+  borderRadius: 12,
+  fontSize: 12,
+  color: "#f9f9fa",
+};
 
 export default function LineChart({
   series,
   xLabels = ["M1", "M2", "M3", "M4"],
-  height = 220,
+  height = 260,
 }: {
   series: SeriesDatum[];
   xLabels?: string[];
   height?: number;
 }) {
-  const width = 480;
-  const paddingLeft = 30;
-  const paddingRight = 12;
-  const paddingTop = 14;
-  const paddingBottom = 24;
-  const chartW = width - paddingLeft - paddingRight;
-  const chartH = height - paddingTop - paddingBottom;
-  const maxVal = 130;
-  const gridlines = [0, 35, 70, 130];
-
-  const xFor = (i: number) =>
-    paddingLeft + (chartW / Math.max(1, xLabels.length - 1)) * i;
-  const yFor = (val: number) =>
-    paddingTop + chartH - (Math.min(val, maxVal) / maxVal) * chartH;
-
   const hasData = series.some((s) => s.values.some((v) => v !== null));
 
   if (!hasData) {
@@ -34,90 +39,62 @@ export default function LineChart({
     );
   }
 
+  const chartData = xLabels.map((label, i) => {
+    const row: Record<string, number | string | null> = { label };
+    series.forEach((s) => {
+      row[s.code] = s.values[i] ?? null;
+    });
+    return row;
+  });
+
   return (
     <div>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="w-full"
-        role="img"
-        aria-label="Trend mingguan"
-      >
-        {gridlines.map((g) => (
-          <g key={g}>
-            <line
-              x1={paddingLeft}
-              x2={width - paddingRight}
-              y1={yFor(g)}
-              y2={yFor(g)}
-              stroke="rgba(255,255,255,0.08)"
-              strokeWidth={1}
+      <ResponsiveContainer width="100%" height={height}>
+        <RLineChart data={chartData} margin={{ top: 16, right: 12, left: -16, bottom: 0 }}>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="rgba(255,255,255,.07)"
+            vertical={false}
+          />
+          <XAxis
+            dataKey="label"
+            stroke="#64748b"
+            tick={{ fill: "#64748b", fontSize: 10 }}
+            tickLine={false}
+            axisLine={{ stroke: "rgba(255,255,255,.08)" }}
+          />
+          <YAxis
+            domain={[0, 130]}
+            ticks={[0, 35, 70, 130]}
+            stroke="#64748b"
+            tick={{ fill: "#64748b", fontSize: 10 }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip contentStyle={tooltipContentStyle} labelStyle={{ color: "#f9f9fa", fontWeight: 600 }} />
+          {series.map((s) => (
+            <Line
+              key={s.code}
+              type="monotone"
+              dataKey={s.code}
+              name={s.label}
+              stroke={s.color}
+              strokeWidth={2}
+              dot={{ r: 3, fill: s.color, strokeWidth: 0 }}
+              activeDot={{ r: 5 }}
+              connectNulls
+              isAnimationActive
+              animationDuration={900}
+              animationEasing="ease-out"
             />
-            <text
-              x={paddingLeft - 6}
-              y={yFor(g) + 3}
-              textAnchor="end"
-              fontSize={9}
-              fill="rgb(155,161,168)"
-            >
-              {g}
-            </text>
-          </g>
-        ))}
-
-        {xLabels.map((label, i) => (
-          <text
-            key={label}
-            x={xFor(i)}
-            y={height - paddingBottom + 16}
-            textAnchor="middle"
-            fontSize={10}
-            fill="rgb(155,161,168)"
-          >
-            {label}
-          </text>
-        ))}
-
-        {series.map((s) => {
-          const points = s.values
-            .map((v, i) => (v === null ? null : `${xFor(i)},${yFor(v)}`))
-            .filter(Boolean);
-          if (points.length === 0) return null;
-          return (
-            <g key={s.code}>
-              <polyline
-                points={points.join(" ")}
-                fill="none"
-                stroke={s.color}
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              {s.values.map((v, i) =>
-                v === null ? null : (
-                  <circle
-                    key={i}
-                    cx={xFor(i)}
-                    cy={yFor(v)}
-                    r={3}
-                    fill={s.color}
-                  />
-                )
-              )}
-            </g>
-          );
-        })}
-      </svg>
-      <div className="mt-2 flex flex-wrap gap-3">
-        {series.map((s) => (
-          <div key={s.code} className="flex items-center gap-1.5 text-xs text-muted">
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: s.color }}
-            />
-            {s.label}
-          </div>
-        ))}
-      </div>
+          ))}
+          <Legend
+            wrapperStyle={{ fontSize: 11, color: "#9ba1a8", paddingTop: 8 }}
+            iconType="circle"
+            iconSize={8}
+          />
+        </RLineChart>
+      </ResponsiveContainer>
     </div>
   );
 }

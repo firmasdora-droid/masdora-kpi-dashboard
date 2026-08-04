@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentYear, getCurrentMonth, monthName } from "@/lib/period";
 import { isManager, type Role } from "@/lib/roles";
@@ -18,6 +19,12 @@ const STATUSES: CampaignStatus[] = [
   "selesai",
   "tunda",
 ];
+
+const cardMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 const EMPTY_FORM = {
   name: "",
@@ -143,7 +150,7 @@ export default function CampaignsPage() {
         </p>
       </div>
 
-      <div className="card flex flex-wrap items-end gap-4">
+      <motion.div {...cardMotion} className="card flex flex-wrap items-end gap-4">
         <div>
           <label className="label">Tahun</label>
           <input
@@ -167,10 +174,14 @@ export default function CampaignsPage() {
             ))}
           </select>
         </div>
-      </div>
+      </motion.div>
 
       {canManage && (
-        <form onSubmit={handleSubmit} className="card grid grid-cols-1 gap-4 md:grid-cols-3">
+        <motion.form
+          {...cardMotion}
+          onSubmit={handleSubmit}
+          className="card grid grid-cols-1 gap-4 md:grid-cols-3"
+        >
           <h3 className="font-semibold text-white md:col-span-3">
             {editingId ? "Kemas kini Kempen" : "Tambah Kempen"}
           </h3>
@@ -268,7 +279,7 @@ export default function CampaignsPage() {
               </button>
             )}
           </div>
-        </form>
+        </motion.form>
       )}
 
       {loading ? (
@@ -279,8 +290,18 @@ export default function CampaignsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {campaigns.map((c) => (
-            <div key={c.id} className="card">
+          {campaigns.map((c, i) => (
+            <motion.div
+              key={c.id}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.45,
+                delay: i * 0.06,
+                ease: [0.4, 0, 0.2, 1],
+              }}
+              className="card"
+            >
               <div className="flex items-start justify-between">
                 <div>
                   <p className="font-semibold text-white">{c.name}</p>
@@ -311,7 +332,7 @@ export default function CampaignsPage() {
                   </button>
                 </div>
               )}
-            </div>
+            </motion.div>
           ))}
         </div>
       )}
