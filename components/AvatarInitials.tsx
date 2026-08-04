@@ -46,11 +46,11 @@ export default function AvatarInitials({
   const bg = colorFor(name, deptColor);
   return (
     <div
-      className={`flex flex-shrink-0 items-center justify-center rounded-full font-semibold text-white ${className}`}
+      className={`grid flex-shrink-0 place-items-center rounded-full font-bold text-slate-900 ${className}`}
       style={{
         width: size,
         height: size,
-        backgroundColor: bg,
+        background: `linear-gradient(150deg, ${bg}, ${bg}55)`,
         fontSize: size * 0.38,
       }}
     >

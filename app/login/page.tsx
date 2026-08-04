@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import MasdoraLogomark from "@/components/MasdoraLogomark";
+import MasdoraWordmark from "@/components/MasdoraWordmark";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -116,12 +118,12 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-[#111921] px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-500 text-xl font-bold text-[#111921]">
-            M
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center">
+            <MasdoraLogomark size={48} color="#F26122" />
           </div>
-          <h1 className="text-2xl font-bold text-white">
-            Masdora KPI Dashboard
-          </h1>
+          <div className="mx-auto mb-2 flex justify-center">
+            <MasdoraWordmark height={20} color="#F26122" />
+          </div>
           <p className="mt-1 text-sm text-muted">
             Log masuk untuk teruskan ke dashboard anda
           </p>

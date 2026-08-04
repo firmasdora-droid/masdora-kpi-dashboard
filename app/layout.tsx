@@ -20,7 +20,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ms" className={dmSans.variable}>
-      <body>{children}</body>
+      <body>
+        <div
+          className="pointer-events-none fixed inset-0"
+          style={{
+            background:
+              "radial-gradient(at 100% 0%, rgba(242,97,34,0.12), rgba(0,0,0,0) 55%), radial-gradient(at 0% 100%, rgba(107,128,66,0.1), rgba(0,0,0,0) 55%)",
+          }}
+        />
+        <div className="relative">{children}</div>
+      </body>
     </html>
   );
 }

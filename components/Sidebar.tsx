@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isManager, canKeyInSale, type Role } from "@/lib/roles";
 import AvatarInitials from "@/components/AvatarInitials";
+import MasdoraLogomark from "@/components/MasdoraLogomark";
+import MasdoraWordmark from "@/components/MasdoraWordmark";
 
 interface NavItem {
   href: string;
@@ -147,13 +149,11 @@ export default function Sidebar({
 
   const sidebarContent = (
     <div className="flex h-full w-64 flex-shrink-0 flex-col border-r border-white/10 bg-[rgba(17,25,33,0.95)] backdrop-blur-md lg:bg-[rgba(17,25,33,0.6)]">
-      <div className="flex items-center gap-2 border-b border-white/10 px-5 py-5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-[#111921] shadow-lg shadow-brand-500/30">
-          M
-        </span>
+      <div className="flex items-center gap-2.5 border-b border-white/10 px-5 py-5">
+        <MasdoraLogomark size={32} color="#F26122" />
         <div>
-          <p className="text-sm font-bold leading-tight text-white">Masdora</p>
-          <p className="text-[11px] leading-tight text-muted">KPI Dashboard</p>
+          <MasdoraWordmark height={14} color="#F26122" />
+          <p className="mt-1 text-[11px] leading-tight text-muted">KPI Dashboard</p>
         </div>
       </div>
 
@@ -228,10 +228,8 @@ export default function Sidebar({
       {/* Mobile top bar */}
       <div className="flex items-center justify-between border-b border-white/10 bg-[rgba(17,25,33,0.95)] px-4 py-3 lg:hidden">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 text-xs font-bold text-[#111921] shadow-lg shadow-brand-500/30">
-            M
-          </span>
-          <span className="text-sm font-bold text-white">Masdora KPI</span>
+          <MasdoraLogomark size={24} color="#F26122" />
+          <MasdoraWordmark height={12} color="#F26122" />
         </div>
         <button
           aria-label="Buka menu"
