@@ -23,11 +23,17 @@ body {
 }
 
 .card {
-  @apply rounded-2xl border border-white/10 bg-[rgba(24,32,42,0.6)] p-4 shadow-sm backdrop-blur-md;
+  @apply rounded-2xl border border-white/10 bg-slate-900/60 p-4 backdrop-blur-md animate-rise;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
 }
 
 .card-sm {
-  @apply rounded-xl border border-white/10 bg-[rgba(24,32,42,0.6)] p-3 shadow-sm backdrop-blur-md;
+  @apply rounded-xl border border-white/10 bg-slate-900/60 p-3 backdrop-blur-md animate-rise;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+}
+
+.card-hover {
+  @apply cursor-pointer transition hover:border-amber-400/30 hover:bg-amber-400/5;
 }
 
 .btn-primary {
@@ -64,6 +70,10 @@ body {
 
 .table-base td {
   @apply border-b border-white/5 px-3 py-2 text-gray-200;
+}
+
+.table-base tbody tr {
+  @apply transition hover:bg-white/5;
 }
 
 .text-muted {

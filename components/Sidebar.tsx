@@ -148,7 +148,7 @@ export default function Sidebar({
   const sidebarContent = (
     <div className="flex h-full w-64 flex-shrink-0 flex-col border-r border-white/10 bg-[rgba(17,25,33,0.95)] backdrop-blur-md lg:bg-[rgba(17,25,33,0.6)]">
       <div className="flex items-center gap-2 border-b border-white/10 px-5 py-5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-[#111921]">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-[#111921] shadow-lg shadow-brand-500/30">
           M
         </span>
         <div>
@@ -189,12 +189,15 @@ export default function Sidebar({
                       key={item.href}
                       href={item.href}
                       onClick={() => setOpen(false)}
-                      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                      className={`relative flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition ${
                         active
-                          ? "bg-brand-500 text-[#111921]"
-                          : "text-gray-300 hover:bg-white/5 hover:text-white"
+                          ? "bg-gradient-to-r from-masdora-orange/20 to-transparent text-amber-200"
+                          : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                       }`}
                     >
+                      {active && (
+                        <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-masdora-orange" />
+                      )}
                       <span aria-hidden>{item.icon}</span>
                       <span className="truncate">{item.label}</span>
                     </Link>
@@ -225,7 +228,7 @@ export default function Sidebar({
       {/* Mobile top bar */}
       <div className="flex items-center justify-between border-b border-white/10 bg-[rgba(17,25,33,0.95)] px-4 py-3 lg:hidden">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-500 text-xs font-bold text-[#111921]">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 text-xs font-bold text-[#111921] shadow-lg shadow-brand-500/30">
             M
           </span>
           <span className="text-sm font-bold text-white">Masdora KPI</span>

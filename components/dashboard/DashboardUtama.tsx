@@ -390,6 +390,7 @@ export default function DashboardUtama() {
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <StatCard
+              index={0}
               icon="🏅"
               label="Skor Keseluruhan"
               value={overallScore !== null ? overallScore.toFixed(1) : "-"}
@@ -397,30 +398,35 @@ export default function DashboardUtama() {
               pill={scoreStatus.pill}
             />
             <StatCard
+              index={1}
               icon="🎯"
               label="KPI Dicapai"
               value={`${totalAchieved}/${totalFilled}`}
               caption="KPI dicapai"
             />
             <StatCard
+              index={2}
               icon="📋"
               label="To-Do Siap"
               value={todoPct !== null ? `${todoPct.toFixed(0)}%` : "-"}
               caption={`${todoSiap}/${todoTotal} kerja siap`}
             />
             <StatCard
+              index={3}
               icon="📝"
               label="Data KPI Diisi"
               value={submissionRate !== null ? `${submissionRate.toFixed(0)}%` : "-"}
               caption={`${filledEntries}/${totalExpectedEntries} diisi`}
             />
             <StatCard
+              index={4}
               icon="⏱️"
               label="Hantar Tepat Masa"
               value={onTimeRate !== null ? `${onTimeRate.toFixed(0)}%` : "-"}
               caption={`${onTimeCount}/${submittedCount} hantar tepat`}
             />
             <StatCard
+              index={5}
               icon="⚠️"
               label="Isu Perlu Tindakan"
               value={String(isuCount)}
@@ -462,7 +468,7 @@ export default function DashboardUtama() {
                   Tiada data jabatan untuk tempoh ini.
                 </div>
               ) : (
-                filteredDeptSummary.map((d) => {
+                filteredDeptSummary.map((d, i) => {
                   const dept = departments.find((x) => x.code === d.dept_code);
                   const status = scoreStatusLabel(d.avg_score);
                   const deptSubs = submissions.filter(
@@ -470,22 +476,32 @@ export default function DashboardUtama() {
                   );
                   const onTime = deptSubs.filter((s) => s.on_time).length;
                   return (
-                    <div key={d.dept_code ?? "-"} className="card">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-semibold text-white">
-                            {dept?.name ?? d.dept_code}
-                          </p>
-                          <p className="text-xs text-muted">
-                            {d.headcount} ahli · {onTime}/{deptSubs.length || d.headcount} tepat masa
-                          </p>
+                    <div
+                      key={d.dept_code ?? "-"}
+                      className="card card-hover animate-rise flex items-center gap-3"
+                      style={{ animationDelay: `${i * 50}ms` }}
+                    >
+                      <span
+                        className="h-8 w-1.5 flex-shrink-0 rounded-full"
+                        style={{ background: dept?.color ?? "#94a3b8" }}
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-bold text-slate-100">
+                              {dept?.name ?? d.dept_code}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              {d.headcount} ahli · {onTime}/{deptSubs.length || d.headcount} tepat masa
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="mt-3 flex items-center justify-between">
-                        <span className="text-2xl font-bold text-brand-400">
-                          {d.avg_score ?? "-"}%
-                        </span>
-                        <StatusBadge status={status.pill} />
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className="text-lg font-black text-white">
+                            {d.avg_score ?? "-"}%
+                          </span>
+                          <StatusBadge status={status.pill} />
+                        </div>
                       </div>
                     </div>
                   );
@@ -502,19 +518,23 @@ export default function DashboardUtama() {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {campaigns.map((c) => (
-                  <div key={c.id} className="card">
+                {campaigns.map((c, i) => (
+                  <div
+                    key={c.id}
+                    className="card card-hover animate-rise"
+                    style={{ animationDelay: `${i * 50}ms` }}
+                  >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold text-white">{c.name}</p>
+                      <p className="font-bold text-slate-100">{c.name}</p>
                       <span className="pill pill-kosong">{c.type}</span>
                     </div>
                     <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
                       <div
-                        className="h-full rounded-full bg-brand-500"
+                        className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all duration-500"
                         style={{ width: `${c.progress}%` }}
                       />
                     </div>
-                    <p className="mt-1 text-xs text-muted">
+                    <p className="mt-1 text-xs text-slate-400">
                       {c.progress}% · {c.status}
                     </p>
                   </div>
@@ -534,7 +554,7 @@ export default function DashboardUtama() {
                 {leaderboard.slice(0, 3).map((row, i) => (
                   <div
                     key={row.user_id}
-                    className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 transition first:pt-2 last:pb-2 hover:bg-white/5"
                   >
                     <span className="w-6 text-lg">{MEDALS[i] ?? `#${row.rank}`}</span>
                     <AvatarInitials
@@ -635,30 +655,49 @@ export default function DashboardUtama() {
   );
 }
 
+const STAT_ACCENTS = [
+  "from-masdora-orange/20 to-masdora-orange/5 border-masdora-orange/25",
+  "from-masdora-olive/25 to-masdora-olive/5 border-masdora-olive/35",
+  "from-masdora-yellow/18 to-masdora-yellow/5 border-masdora-yellow/25",
+  "from-masdora-orange/20 to-masdora-orange/5 border-masdora-orange/25",
+  "from-masdora-gray/15 to-masdora-gray/5 border-masdora-gray/25",
+  "from-masdora-alert/20 to-masdora-alert/5 border-masdora-alert/25",
+];
+
 function StatCard({
   icon,
   label,
   value,
   caption,
   pill,
+  index = 0,
 }: {
   icon: string;
   label: string;
   value: string;
   caption: string;
   pill?: KpiStatusColor;
+  index?: number;
 }) {
+  const accent = STAT_ACCENTS[index % STAT_ACCENTS.length];
   return (
-    <div className="card">
-      <div className="flex items-center gap-2 text-xs text-muted">
-        <span aria-hidden>{icon}</span>
-        <span>{label}</span>
+    <div
+      className={`animate-rise rounded-2xl border bg-gradient-to-br p-4 ${accent}`}
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+          {label}
+        </span>
+        <span className="text-lg" aria-hidden>
+          {icon}
+        </span>
       </div>
-      <p className="mt-1 text-2xl font-bold text-white">{value}</p>
+      <p className="mt-2 text-2xl font-black text-white">{value}</p>
       {pill ? (
         <span className={`pill pill-${pill} mt-1`}>{caption}</span>
       ) : (
-        <p className="text-xs text-muted">{caption}</p>
+        <p className="mt-1 text-[11px] text-slate-400">{caption}</p>
       )}
     </div>
   );

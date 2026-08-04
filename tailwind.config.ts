@@ -25,6 +25,13 @@ const config: Config = {
           DEFAULT: "#111921",
           soft: "#18202a",
         },
+        masdora: {
+          orange: "#F26122",
+          olive: "#6B8042",
+          yellow: "#FDE585",
+          gray: "#D8D6CF",
+          alert: "#D9432A",
+        },
       },
       fontFamily: {
         sans: [
@@ -34,6 +41,15 @@ const config: Config = {
           "Segoe UI",
           "sans-serif",
         ],
+      },
+      keyframes: {
+        rise: {
+          "0%": { opacity: "0", transform: "translateY(14px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        rise: "rise 0.45s cubic-bezier(0.4,0,0.2,1) both",
       },
     },
   },
