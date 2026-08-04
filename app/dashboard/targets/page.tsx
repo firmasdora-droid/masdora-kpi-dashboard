@@ -6,9 +6,11 @@ import {
   getCurrentYear,
   getCurrentMonth,
   getCurrentWeekOfMonth,
+  monthName,
 } from "@/lib/period";
 import WeekPicker, { WeekValue } from "@/components/WeekPicker";
-import type { KpiDefinition, KpiTarget, Profile } from "@/types/database";
+import { SALE_ELIGIBLE_POSITIONS } from "@/lib/roles";
+import type { KpiDefinition, KpiTarget, Profile, SalesTarget } from "@/types/database";
 
 interface TargetRow {
   kpi_id: string;
@@ -32,6 +34,10 @@ export default function TargetsPage() {
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const [salesTargetInput, setSalesTargetInput] = useState("0");
+  const [savingSalesTarget, setSavingSalesTarget] = useState(false);
+  const [salesMessage, setSalesMessage] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -105,6 +111,62 @@ export default function TargetsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const saleEligible = !!targetProfile?.position_code &&
+    (SALE_ELIGIBLE_POSITIONS as readonly string[]).includes(
+      targetProfile.position_code
+    );
+
+  const loadSalesTarget = useCallback(async () => {
+    if (!selectedUserId || !saleEligible) {
+      setSalesTargetInput("0");
+      return;
+    }
+    setSalesMessage(null);
+    const { data } = await supabase
+      .from("sales_targets")
+      .select("*")
+      .eq("user_id", selectedUserId)
+      .eq("year", week.year)
+      .eq("month", week.month)
+      .maybeSingle<SalesTarget>();
+    setSalesTargetInput(String(data?.target_rm ?? 0));
+  }, [selectedUserId, saleEligible, week.year, week.month, supabase]);
+
+  useEffect(() => {
+    loadSalesTarget();
+  }, [loadSalesTarget]);
+
+  async function handleSaveSalesTarget() {
+    if (!selectedUserId) return;
+    const target_rm = Number(salesTargetInput);
+    if (Number.isNaN(target_rm) || target_rm < 0) {
+      setSalesMessage("Sasaran jualan mesti nombor.");
+      return;
+    }
+    setSavingSalesTarget(true);
+    setSalesMessage(null);
+
+    const { error } = await supabase.from("sales_targets").upsert(
+      {
+        user_id: selectedUserId,
+        year: week.year,
+        month: week.month,
+        target_rm,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,year,month" }
+    );
+
+    setSavingSalesTarget(false);
+
+    if (error) {
+      setSalesMessage("Gagal menyimpan sasaran jualan: " + error.message);
+    } else {
+      setSalesMessage("Sasaran jualan berjaya disimpan.");
+      loadSalesTarget();
+    }
+  }
 
   async function handleSave(row: TargetRow, value: string) {
     if (!selectedUserId) return;
@@ -199,6 +261,37 @@ export default function TargetsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {saleEligible && (
+        <div>
+          <h3 className="mb-2 font-semibold text-white">
+            Sasaran Jualan Bulanan
+          </h3>
+          <div className="card flex flex-wrap items-end gap-4">
+            <div>
+              <label className="label">Sasaran (RM) — {monthName(week.month)} {week.year}</label>
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                className="input w-40"
+                value={salesTargetInput}
+                onChange={(e) => setSalesTargetInput(e.target.value)}
+              />
+            </div>
+            <button
+              className="btn-primary"
+              disabled={savingSalesTarget}
+              onClick={handleSaveSalesTarget}
+            >
+              {savingSalesTarget ? "Menyimpan..." : "Simpan"}
+            </button>
+            {salesMessage && (
+              <p className="w-full text-sm text-brand-400">{salesMessage}</p>
+            )}
+          </div>
         </div>
       )}
     </div>

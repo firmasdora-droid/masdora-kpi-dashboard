@@ -288,3 +288,55 @@ export interface VKpiPending extends KpiDefinition {
   proposed_by_name: string | null;
   proposed_for_name: string | null;
 }
+
+export interface VSalesLeaderboard {
+  id: number;
+  user_id: string;
+  full_name: string;
+  dept_code: string | null;
+  position_code: string | null;
+  date: string;
+  year: number;
+  month: number;
+  week: number;
+  amount_rm: number;
+  platform: SalePlatform;
+  team: string | null;
+  host_name: string | null;
+  live_account: string | null;
+}
+
+export interface VSalesRankDaily {
+  date: string;
+  user_id: string;
+  full_name: string;
+  dept_code: string | null;
+  total_rm: number;
+  entries: number;
+  rank: number;
+}
+
+export interface VSalesRankWeekly {
+  year: number;
+  month: number;
+  week: number;
+  user_id: string;
+  full_name: string;
+  dept_code: string | null;
+  total_rm: number;
+  entries: number;
+  rank: number;
+}
+
+export interface VSalesRankMonthly {
+  year: number;
+  month: number;
+  user_id: string;
+  full_name: string;
+  dept_code: string | null;
+  total_rm: number;
+  entries: number;
+  target_rm: number | null;
+  pct_target: number | null;
+  rank: number;
+}
