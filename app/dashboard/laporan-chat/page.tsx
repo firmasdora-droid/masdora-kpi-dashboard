@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { monthName } from "@/lib/period";
+import AvatarInitials from "@/components/AvatarInitials";
 
 interface ChatLogRow {
   date: string;
@@ -39,13 +40,6 @@ const cardMotion = {
   transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
 };
 
-const STAT_ACCENTS = [
-  "from-masdora-orange/20 to-masdora-orange/5 border-masdora-orange/25",
-  "from-masdora-olive/25 to-masdora-olive/5 border-masdora-olive/35",
-  "from-masdora-yellow/18 to-masdora-yellow/5 border-masdora-yellow/25",
-  "from-masdora-gray/15 to-masdora-gray/5 border-masdora-gray/25",
-];
-
 const PLATFORMS = [
   { key: "whatsapp", label: "WhatsApp" },
   { key: "telegram", label: "Telegram" },
@@ -61,6 +55,7 @@ export default function LaporanChatPage() {
 
   const [periodFilter, setPeriodFilter] = useState("");
   const [handlerFilter, setHandlerFilter] = useState("");
+  const [showTable, setShowTable] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,6 +88,11 @@ export default function LaporanChatPage() {
     return Array.from(set.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [rows]);
 
+  // Bulan terkini dipilih secara automatik supaya paparan tak terlalu padat.
+  useEffect(() => {
+    if (!periodFilter && periods.length > 0) setPeriodFilter(periods[0][0]);
+  }, [periods, periodFilter]);
+
   const handlers = useMemo(
     () => Array.from(new Set(rows.map((r) => r.handler))).sort(),
     [rows]
@@ -110,10 +110,11 @@ export default function LaporanChatPage() {
   );
 
   const totalOpen = filtered.reduce((s, r) => s + r.totalOpen, 0);
-  const totalClose = filtered.reduce((s, r) => s + r.totalClose, 0);
   const uniqueDays = new Set(filtered.map((r) => r.date)).size;
+  const avgPerDay = uniqueDays > 0 ? Math.round(totalOpen / uniqueDays) : 0;
 
-  const platformTotals = useMemo(
+  /** Hanya platform yang benar-benar ada data — yang kosong disembunyikan. */
+  const activePlatforms = useMemo(
     () =>
       PLATFORMS.map((p) => ({
         ...p,
@@ -121,33 +122,35 @@ export default function LaporanChatPage() {
           (s, r) => s + (r[`${p.key}Open` as keyof ChatLogRow] as number),
           0
         ),
-        close: filtered.reduce(
-          (s, r) => s + (r[`${p.key}Close` as keyof ChatLogRow] as number),
-          0
-        ),
-      })),
+      })).filter((p) => p.open > 0),
     [filtered]
   );
-  const maxPlatformOpen = Math.max(1, ...platformTotals.map((p) => p.open));
 
   const perHandler = useMemo(() => {
-    const map = new Map<string, { open: number; close: number; days: Set<string> }>();
+    const map = new Map<string, number>();
     filtered.forEach((r) => {
-      const cur = map.get(r.handler) ?? { open: 0, close: 0, days: new Set<string>() };
-      cur.open += r.totalOpen;
-      cur.close += r.totalClose;
-      cur.days.add(r.date);
-      map.set(r.handler, cur);
+      map.set(r.handler, (map.get(r.handler) ?? 0) + r.totalOpen);
     });
     return Array.from(map.entries())
-      .map(([handler, v]) => ({
-        handler,
-        open: v.open,
-        close: v.close,
-        days: v.days.size,
-      }))
+      .map(([handler, open]) => ({ handler, open }))
       .sort((a, b) => b.open - a.open);
   }, [filtered]);
+  const maxHandler = Math.max(1, ...perHandler.map((h) => h.open));
+
+  /** Jumlah chat setiap hari (semua handler yang dipilih digabung). */
+  const perDay = useMemo(() => {
+    const map = new Map<string, number>();
+    filtered.forEach((r) => {
+      map.set(r.date, (map.get(r.date) ?? 0) + r.totalOpen);
+    });
+    return Array.from(map.entries())
+      .map(([date, open]) => ({ date, open }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [filtered]);
+  const maxDay = Math.max(1, ...perDay.map((d) => d.open));
+
+  const periodLabel =
+    periods.find(([k]) => k === periodFilter)?.[1] ?? "Semua bulan";
 
   return (
     <div className="space-y-6">
@@ -155,7 +158,7 @@ export default function LaporanChatPage() {
         <div>
           <h2 className="text-xl font-bold text-white">Laporan Chat Harian</h2>
           <p className="text-sm text-muted">
-            Terus dari Google Doc &ldquo;Daily Chat Report&rdquo; — sentiasa terkini.
+            Terus dari Google Doc — sentiasa terkini.
           </p>
         </div>
         <div className="flex gap-2">
@@ -182,37 +185,7 @@ export default function LaporanChatPage() {
         </motion.div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          index={0}
-          icon="💬"
-          label="Chat Dibuka"
-          value={totalOpen.toLocaleString("ms-MY")}
-          caption="semua platform"
-        />
-        <StatCard
-          index={1}
-          icon="✅"
-          label="Chat Ditutup"
-          value={totalClose.toLocaleString("ms-MY")}
-          caption="selesai dilayan"
-        />
-        <StatCard
-          index={2}
-          icon="📅"
-          label="Hari Direkod"
-          value={String(uniqueDays)}
-          caption={periodFilter ? "dalam tempoh dipilih" : "keseluruhan"}
-        />
-        <StatCard
-          index={3}
-          icon="👥"
-          label="Purata Sehari"
-          value={uniqueDays > 0 ? Math.round(totalOpen / uniqueDays).toLocaleString("ms-MY") : "0"}
-          caption="chat dibuka / hari"
-        />
-      </div>
-
+      {/* Penapis diletak di atas supaya jelas apa yang sedang dilihat */}
       <motion.div {...cardMotion} className="card flex flex-wrap items-end gap-4">
         <div>
           <label className="label">Bulan</label>
@@ -239,7 +212,7 @@ export default function LaporanChatPage() {
             <option value="">Semua Handler</option>
             {handlers.map((h) => (
               <option key={h} value={h}>
-                {HANDLER_NAMES[h] ? `${HANDLER_NAMES[h]} (${h})` : h}
+                {HANDLER_NAMES[h] ?? h}
               </option>
             ))}
           </select>
@@ -247,35 +220,92 @@ export default function LaporanChatPage() {
       </motion.div>
 
       {loading ? (
-        <p className="text-sm text-muted">Memuatkan data dari Google Doc...</p>
+        <p className="text-sm text-muted">Memuatkan data...</p>
       ) : filtered.length === 0 ? (
         <motion.div {...cardMotion} className="card text-center text-sm text-muted">
           Tiada rekod untuk penapis ini.
         </motion.div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* Satu nombor besar sahaja — apa yang paling penting */}
+          <motion.div
+            {...cardMotion}
+            className="rounded-2xl border border-masdora-orange/25 bg-gradient-to-br from-masdora-orange/20 to-masdora-orange/5 p-6"
+          >
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+              Jumlah chat dibalas · {periodLabel}
+              {handlerFilter ? ` · ${HANDLER_NAMES[handlerFilter] ?? handlerFilter}` : ""}
+            </p>
+            <p className="mt-1 text-5xl font-black text-white">
+              {totalOpen.toLocaleString("ms-MY")}
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              <span className="font-bold text-white">{avgPerDay}</span> chat sehari ·{" "}
+              <span className="font-bold text-white">{uniqueDays}</span> hari bekerja
+              {activePlatforms.length === 1 && (
+                <> · semua melalui {activePlatforms[0].label}</>
+              )}
+            </p>
+          </motion.div>
+
+          {/* Ranking handler — hanya bila lebih daripada seorang */}
+          {perHandler.length > 1 && (
             <motion.div {...cardMotion} className="card">
-              <h3 className="mb-4 font-semibold text-white">
-                Chat Mengikut Platform
-              </h3>
+              <h3 className="mb-4 font-semibold text-white">Siapa Paling Banyak</h3>
               <div className="space-y-3">
-                {platformTotals.map((p, i) => (
+                {perHandler.map((h, i) => (
+                  <div key={h.handler} className="flex items-center gap-3">
+                    <span className="w-5 text-center text-sm font-bold text-slate-500">
+                      {i + 1}
+                    </span>
+                    <AvatarInitials
+                      name={HANDLER_NAMES[h.handler] ?? h.handler}
+                      size={32}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-baseline justify-between gap-2">
+                        <span className="truncate text-sm font-bold text-slate-100">
+                          {HANDLER_NAMES[h.handler] ?? h.handler}
+                        </span>
+                        <span className="text-sm font-black text-white">
+                          {h.open.toLocaleString("ms-MY")}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                        <motion.div
+                          className="h-full rounded-full bg-gradient-to-r from-masdora-orange to-masdora-orange/60"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(h.open / maxHandler) * 100}%` }}
+                          transition={{ duration: 0.7, delay: i * 0.08, ease: "easeOut" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Platform — hanya tunjuk kalau memang guna lebih daripada satu */}
+          {activePlatforms.length > 1 && (
+            <motion.div {...cardMotion} className="card">
+              <h3 className="mb-4 font-semibold text-white">Mengikut Platform</h3>
+              <div className="space-y-3">
+                {activePlatforms.map((p, i) => (
                   <div key={p.key}>
-                    <div className="mb-1 flex items-center justify-between text-sm">
+                    <div className="mb-1 flex items-baseline justify-between text-sm">
                       <span className="font-semibold text-slate-200">{p.label}</span>
-                      <span className="text-slate-400">
-                        <span className="font-bold text-white">
-                          {p.open.toLocaleString("ms-MY")}
-                        </span>{" "}
-                        dibuka · {p.close.toLocaleString("ms-MY")} ditutup
+                      <span className="font-black text-white">
+                        {p.open.toLocaleString("ms-MY")}
                       </span>
                     </div>
-                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                       <motion.div
-                        className="h-full rounded-full bg-gradient-to-r from-masdora-orange to-masdora-orange/60"
+                        className="h-full rounded-full bg-gradient-to-r from-masdora-olive to-masdora-olive/60"
                         initial={{ width: 0 }}
-                        animate={{ width: `${(p.open / maxPlatformOpen) * 100}%` }}
+                        animate={{
+                          width: `${(p.open / activePlatforms[0].open) * 100}%`,
+                        }}
                         transition={{ duration: 0.7, delay: i * 0.08, ease: "easeOut" }}
                       />
                     </div>
@@ -283,138 +313,86 @@ export default function LaporanChatPage() {
                 ))}
               </div>
             </motion.div>
+          )}
 
-            <motion.div {...cardMotion} className="card">
-              <h3 className="mb-4 font-semibold text-white">Prestasi Handler</h3>
-              <div className="space-y-3">
-                {perHandler.map((h, i) => (
+          {/* Trend harian sebagai carta — ganti jadual panjang */}
+          <motion.div {...cardMotion} className="card">
+            <h3 className="mb-1 font-semibold text-white">Trend Harian</h3>
+            <p className="mb-4 text-xs text-slate-400">
+              Bilangan chat setiap hari · {periodLabel}
+            </p>
+            <div className="flex h-40 items-end gap-1.5 overflow-x-auto pb-1">
+              {perDay.map((d, i) => (
+                <div
+                  key={d.date}
+                  className="group flex min-w-[18px] flex-1 flex-col items-center gap-1.5"
+                  title={`${d.date}: ${d.open} chat`}
+                >
+                  <span className="text-[10px] font-bold text-slate-400 opacity-0 transition group-hover:opacity-100">
+                    {d.open}
+                  </span>
                   <motion.div
-                    key={h.handler}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: i * 0.06 }}
-                    className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
-                  >
-                    <span className="w-6 text-center text-sm font-bold text-slate-400">
-                      {i + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-slate-100">
-                        {HANDLER_NAMES[h.handler] ?? h.handler}
-                      </p>
-                      <p className="text-[11px] text-slate-500">
-                        {h.handler} · {h.days} hari direkod
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-black text-white">
-                        {h.open.toLocaleString("ms-MY")}
-                      </p>
-                      <p className="text-[11px] text-slate-500">chat dibuka</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
+                    className="w-full rounded-t bg-gradient-to-t from-masdora-orange/40 to-masdora-orange transition group-hover:from-masdora-orange/60"
+                    initial={{ height: 0 }}
+                    animate={{ height: `${Math.max(4, (d.open / maxDay) * 100)}%` }}
+                    transition={{
+                      duration: 0.6,
+                      delay: Math.min(i * 0.02, 0.5),
+                      ease: "easeOut",
+                    }}
+                  />
+                  <span className="text-[9px] text-slate-500">
+                    {Number(d.date.slice(8, 10))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
 
+          {/* Jadual penuh disorok — buka hanya kalau perlu detail */}
           <div>
-            <h3 className="mb-2 font-semibold text-white">
-              Rekod Harian ({filtered.length})
-            </h3>
-            <motion.div {...cardMotion} className="card overflow-x-auto">
-              <table className="table-base">
-                <thead>
-                  <tr>
-                    <th>Tarikh</th>
-                    <th>Handler</th>
-                    <th>WhatsApp</th>
-                    <th>Telegram</th>
-                    <th>Instagram</th>
-                    <th>TikTok</th>
-                    <th>Web</th>
-                    <th>Jumlah</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.slice(0, 200).map((r) => (
-                    <tr key={`${r.date}-${r.handler}`}>
-                      <td>{r.date}</td>
-                      <td>
-                        <span className="font-semibold text-slate-100">
-                          {HANDLER_NAMES[r.handler] ?? r.handler}
-                        </span>
-                      </td>
-                      <td>{cell(r.whatsappOpen, r.whatsappClose)}</td>
-                      <td>{cell(r.telegramOpen, r.telegramClose)}</td>
-                      <td>{cell(r.instagramOpen, r.instagramClose)}</td>
-                      <td>{cell(r.tiktokOpen, r.tiktokClose)}</td>
-                      <td>{cell(r.webOpen, r.webClose)}</td>
-                      <td>
-                        <span className="font-bold text-brand-400">
-                          {r.totalOpen}
-                        </span>
-                        <span className="text-slate-500"> / {r.totalClose}</span>
-                      </td>
+            <button
+              onClick={() => setShowTable((v) => !v)}
+              className="btn-secondary"
+            >
+              {showTable ? "Sembunyikan rekod penuh" : `Lihat rekod penuh (${filtered.length})`}
+            </button>
+
+            {showTable && (
+              <motion.div {...cardMotion} className="card mt-3 overflow-x-auto">
+                <table className="table-base">
+                  <thead>
+                    <tr>
+                      <th>Tarikh</th>
+                      <th>Handler</th>
+                      {activePlatforms.map((p) => (
+                        <th key={p.key}>{p.label}</th>
+                      ))}
+                      <th>Jumlah</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filtered.length > 200 && (
-                <p className="mt-3 text-xs text-muted">
-                  Menunjukkan 200 rekod terkini daripada {filtered.length}. Guna
-                  penapis bulan untuk lihat tempoh lain.
-                </p>
-              )}
-            </motion.div>
+                  </thead>
+                  <tbody>
+                    {filtered.map((r) => (
+                      <tr key={`${r.date}-${r.handler}`}>
+                        <td>{r.date}</td>
+                        <td className="font-semibold text-slate-100">
+                          {HANDLER_NAMES[r.handler] ?? r.handler}
+                        </td>
+                        {activePlatforms.map((p) => (
+                          <td key={p.key}>
+                            {(r[`${p.key}Open` as keyof ChatLogRow] as number) || "—"}
+                          </td>
+                        ))}
+                        <td className="font-bold text-brand-400">{r.totalOpen}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </motion.div>
+            )}
           </div>
         </>
       )}
     </div>
-  );
-}
-
-function cell(open: number, close: number) {
-  if (open === 0 && close === 0) return <span className="text-slate-600">—</span>;
-  return (
-    <span>
-      {open}
-      <span className="text-slate-500"> / {close}</span>
-    </span>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  caption,
-  index = 0,
-}: {
-  icon: string;
-  label: string;
-  value: string;
-  caption: string;
-  index?: number;
-}) {
-  return (
-    <motion.div
-      {...cardMotion}
-      transition={{ ...cardMotion.transition, delay: index * 0.06 }}
-      className={`rounded-2xl border bg-gradient-to-br p-4 ${
-        STAT_ACCENTS[index % STAT_ACCENTS.length]
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
-          {label}
-        </span>
-        <span className="text-lg" aria-hidden>
-          {icon}
-        </span>
-      </div>
-      <p className="mt-2 text-2xl font-black text-white">{value}</p>
-      <p className="mt-1 truncate text-[11px] text-slate-400">{caption}</p>
-    </motion.div>
   );
 }
