@@ -10,6 +10,7 @@ export function isCeo(role: Role | null | undefined): boolean {
 
 /** Jawatan yang layak key-in jualan (sales), sepadan dengan fungsi is_sale_eligible() di DB. */
 export const SALE_ELIGIBLE_POSITIONS = [
+  "CS_AGENT",
   "CS_WEB",
   "CS_SHOPEE",
   "CS_TIKTOK",
