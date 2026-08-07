@@ -80,6 +80,12 @@ export default function Sidebar({
           icon: "🚨",
           show: true,
         },
+        {
+          href: "/dashboard/laporan-chat",
+          label: "Laporan Chat",
+          icon: "💬",
+          show: true,
+        },
       ],
     },
     {
