@@ -74,6 +74,12 @@ export default function Sidebar({
           icon: "💰",
           show: canKeyInSale(role, positionCode) || manager,
         },
+        {
+          href: "/dashboard/isu-pelanggan",
+          label: "Isu Pelanggan",
+          icon: "🚨",
+          show: true,
+        },
       ],
     },
     {
