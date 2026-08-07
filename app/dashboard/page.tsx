@@ -20,7 +20,7 @@ export default async function OverviewPage() {
   if (!profile) redirect("/login");
 
   if (profile.role !== "manager" && profile.role !== "ceo") {
-    redirect("/dashboard/kpi");
+    redirect("/dashboard/todos");
   }
 
   return <DashboardUtama />;

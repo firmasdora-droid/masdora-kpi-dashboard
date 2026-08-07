@@ -45,6 +45,8 @@ export interface Profile {
   bio: string | null;
   joined_at: string | null;
   created_at: string;
+  /** Kod handler dalam laporan CS (MAI / TI / HAWA). Null jika bukan staff CS. */
+  handler_code?: string | null;
 }
 
 export interface KpiDefinition {

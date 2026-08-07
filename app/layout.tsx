@@ -9,8 +9,9 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Masdora KPI Dashboard",
-  description: "Dashboard KPI, To-Do, Leaderboard & Jualan untuk pasukan Masdora",
+  title: "Masdora Team Dashboard",
+  description:
+    "Dashboard To-Do, Jualan, Leaderboard & Laporan CS untuk pasukan Masdora",
 };
 
 export default function RootLayout({

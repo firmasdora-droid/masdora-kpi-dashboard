@@ -71,6 +71,18 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
+/**
+ * Normalkan kod handler. "SHA" ialah kod lain yang digunakan untuk orang yang
+ * sama seperti "HAWA" (Natasya), jadi ia digabungkan supaya penapis dan
+ * kiraan tidak terpecah dua.
+ */
+const HANDLER_ALIASES: Record<string, string> = { SHA: "HAWA" };
+
+function normalizeHandler(raw: string): string {
+  const h = raw.trim().toUpperCase();
+  return HANDLER_ALIASES[h] ?? h;
+}
+
 /** Cari index lajur pertama yang header-nya mengandungi salah satu kata kunci. */
 function findCol(headers: string[], keywords: string[]): number {
   for (let i = 0; i < headers.length; i++) {
@@ -148,7 +160,7 @@ async function fetchTab(tab: { name: string; gid: string }): Promise<CsIssue[]> 
     const platform = get(cPlatform);
     const description = get(cDesc);
     const solution = get(cSolution);
-    const handler = get(cHandler).toUpperCase();
+    const handler = normalizeHandler(get(cHandler));
 
     // Langkau baris yang benar-benar kosong
     if (!username && !platform && !description && !handler) continue;

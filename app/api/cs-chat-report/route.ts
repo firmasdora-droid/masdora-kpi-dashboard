@@ -16,6 +16,8 @@ const DOC_ID = "14yACfwqebYdz7m-8PU5MCtu9quoB2TnbSkquHeLoZn4";
 const REVALIDATE_SECONDS = 60;
 
 const HANDLERS = ["MAI", "HAWA", "TI", "SHA"];
+/** "SHA" ialah kod lain untuk orang yang sama seperti "HAWA" (Natasya). */
+const HANDLER_ALIASES: Record<string, string> = { SHA: "HAWA" };
 const DATE_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const STOP_WORDS = [
   "HANDLER",
@@ -115,7 +117,7 @@ function parseDoc(text: string): ChatLogRow[] {
       date: currentIso,
       year: currentYear,
       month: currentMonth,
-      handler: upper,
+      handler: HANDLER_ALIASES[upper] ?? upper,
       whatsappOpen: nums[0],
       whatsappClose: nums[1],
       telegramOpen: nums[2],

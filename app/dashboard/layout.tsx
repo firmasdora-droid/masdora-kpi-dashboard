@@ -45,6 +45,7 @@ export default async function DashboardLayout({
         positionCode={profile.position_code}
         fullName={profile.full_name}
         positionName={positionName}
+        handlerCode={profile.handler_code ?? null}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <main className="flex-1 p-4 md:p-6">{children}</main>

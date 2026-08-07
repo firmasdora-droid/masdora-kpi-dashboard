@@ -14,6 +14,8 @@ interface NavItem {
   label: string;
   icon: string;
   show: boolean;
+  /** Buka dalam tab baru (untuk pautan ke sistem luar). */
+  external?: boolean;
 }
 
 interface NavGroup {
@@ -32,11 +34,13 @@ export default function Sidebar({
   positionCode,
   fullName,
   positionName,
+  handlerCode,
 }: {
   role: Role;
   positionCode: string | null;
   fullName: string;
   positionName: string | null;
+  handlerCode?: string | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -49,7 +53,6 @@ export default function Sidebar({
     {
       title: "Kerja Saya",
       items: [
-        { href: "/dashboard/kpi", label: "KPI Saya", icon: "🎯", show: true },
         {
           href: "/dashboard/todos",
           label: "To-Do Mingguan",
@@ -86,6 +89,14 @@ export default function Sidebar({
           icon: "💬",
           show: true,
         },
+        {
+          href: "https://masdora.zo.space/team/recovery-crm",
+          label: "Recovery CRM",
+          icon: "🔗",
+          // Hanya untuk Maisarah (handler MAI).
+          show: handlerCode === "MAI",
+          external: true,
+        },
       ],
     },
     {
@@ -97,35 +108,11 @@ export default function Sidebar({
           icon: "📊",
           show: manager || role === "ceo",
         },
-        {
-          href: "/dashboard/kpi-team",
-          label: "KPI Team",
-          icon: "👔",
-          show: manager || role === "ceo",
-        },
-        {
-          href: "/dashboard/admin/kpi-definitions",
-          label: "KPI Setiap Jawatan",
-          icon: "🗂️",
-          show: manager || role === "ceo",
-        },
-        {
-          href: "/dashboard/laporan",
-          label: "Laporan",
-          icon: "📑",
-          show: manager || role === "ceo",
-        },
       ],
     },
     {
       title: "Urus",
       items: [
-        {
-          href: "/dashboard/targets",
-          label: "Tetapkan Sasaran",
-          icon: "🎚️",
-          show: manager,
-        },
         {
           href: "/dashboard/campaigns",
           label: "Kempen Bulanan",
@@ -165,7 +152,9 @@ export default function Sidebar({
         <MasdoraLogomark size={32} color="#F26122" />
         <div>
           <MasdoraWordmark height={14} color="#F26122" />
-          <p className="mt-1 text-[11px] leading-tight text-muted">KPI Dashboard</p>
+          <p className="mt-1 text-[11px] leading-tight text-muted">
+            Team Dashboard
+          </p>
         </div>
       </div>
 
@@ -195,23 +184,51 @@ export default function Sidebar({
               </p>
               <div className="space-y-1">
                 {visible.map((item) => {
-                  const active = isActive(item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setOpen(false)}
-                      className={`relative flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition ${
-                        active
-                          ? "bg-gradient-to-r from-masdora-orange/20 to-transparent text-amber-200"
-                          : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-                      }`}
-                    >
+                  const active = !item.external && isActive(item.href);
+                  const className = `relative flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition ${
+                    active
+                      ? "bg-gradient-to-r from-masdora-orange/20 to-transparent text-amber-200"
+                      : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  }`;
+
+                  const inner = (
+                    <>
                       {active && (
                         <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-masdora-orange" />
                       )}
                       <span aria-hidden>{item.icon}</span>
                       <span className="truncate">{item.label}</span>
+                      {item.external && (
+                        <span className="ml-auto text-[10px] text-slate-500" aria-hidden>
+                          ↗
+                        </span>
+                      )}
+                    </>
+                  );
+
+                  if (item.external) {
+                    return (
+                      <a
+                        key={item.href}
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setOpen(false)}
+                        className={className}
+                      >
+                        {inner}
+                      </a>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className={className}
+                    >
+                      {inner}
                     </Link>
                   );
                 })}
@@ -229,7 +246,7 @@ export default function Sidebar({
           🚪 Log Keluar
         </button>
         <p className="mt-2 px-3 text-[10px] text-muted">
-          Masdora KPI Dashboard v2.0.0
+          Masdora Team Dashboard v3.0.0
         </p>
       </div>
     </div>

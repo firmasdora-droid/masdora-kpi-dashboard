@@ -26,7 +26,7 @@ export default async function AdminHubPage() {
       <div>
         <h2 className="text-xl font-bold text-white">Admin</h2>
         <p className="text-sm text-muted">
-          Ruangan pengurusan pengguna & definisi KPI (khas untuk Manager).
+          Ruangan pengurusan pengguna (khas untuk Manager).
         </p>
       </div>
 
@@ -36,12 +36,6 @@ export default async function AdminHubPage() {
           href="/dashboard/admin/users"
           title="Urus Pengguna"
           description="Lihat senarai pengguna & jemput ahli baru."
-        />
-        <AdminNavCard
-          index={1}
-          href="/dashboard/admin/kpi-definitions"
-          title="Definisi KPI"
-          description="Urus sasaran, berat, dan lulus/tolak cadangan KPI."
         />
       </div>
     </div>

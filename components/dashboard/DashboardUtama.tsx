@@ -10,25 +10,14 @@ import {
   getCurrentWeekOfMonth,
   monthName,
 } from "@/lib/period";
-import BarChart from "@/components/charts/BarChart";
-import DonutChart from "@/components/charts/DonutChart";
-import LineChart from "@/components/charts/LineChart";
-import RadarChart from "@/components/charts/RadarChart";
 import AvatarInitials from "@/components/AvatarInitials";
-import StatusBadge from "@/components/StatusBadge";
-import type { ChartDatum, SeriesDatum } from "@/components/charts/types";
 import type {
   Campaign,
   Department,
-  KpiDefinition,
   KpiStatusColor,
   Profile,
   Todo,
-  VDeptSummary,
-  VKpiStatus,
-  VLeaderboard,
   VWeekSummary,
-  VWeeklyScore,
   WeeklySubmission,
 } from "@/types/database";
 
@@ -40,19 +29,21 @@ const cardMotion = {
   transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
 };
 
-function scoreStatusLabel(score: number | null): {
-  label: string;
-  pill: KpiStatusColor;
-} {
-  if (score === null) return { label: "Tiada Data", pill: "kosong" };
-  if (score >= 100) return { label: "Capai", pill: "hijau" };
-  if (score >= 85) return { label: "Hampir", pill: "kuning" };
-  return { label: "Lemah", pill: "merah" };
-}
-
 function avg(nums: number[]): number | null {
   if (nums.length === 0) return null;
   return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+/** Tiering for to-do completion percentage. */
+function completionTier(pct: number | null): {
+  label: string;
+  pill: KpiStatusColor;
+} {
+  if (pct === null) return { label: "Tiada Data", pill: "kosong" };
+  if (pct >= 100) return { label: "Lengkap", pill: "hijau" };
+  if (pct >= 85) return { label: "Hampir", pill: "kuning" };
+  if (pct >= 60) return { label: "Sederhana", pill: "oren" };
+  return { label: "Rendah", pill: "merah" };
 }
 
 export default function DashboardUtama() {
@@ -66,48 +57,23 @@ export default function DashboardUtama() {
   const [loading, setLoading] = useState(true);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [kpiDefs, setKpiDefs] = useState<KpiDefinition[]>([]);
-  const [weeklyScores, setWeeklyScores] = useState<VWeeklyScore[]>([]);
-  const [kpiStatusRows, setKpiStatusRows] = useState<VKpiStatus[]>([]);
   const [weekSummaries, setWeekSummaries] = useState<VWeekSummary[]>([]);
   const [submissions, setSubmissions] = useState<WeeklySubmission[]>([]);
   const [tangguhTodos, setTangguhTodos] = useState<Todo[]>([]);
-  const [deptSummary, setDeptSummary] = useState<VDeptSummary[]>([]);
-  const [monthlyScores, setMonthlyScores] = useState<VWeeklyScore[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [leaderboard, setLeaderboard] = useState<VLeaderboard[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     const [
       { data: deptRows },
       { data: profileRows },
-      { data: defRows },
-      { data: scoreRows },
-      { data: statusRows },
       { data: summaryRows },
       { data: subRows },
       { data: todoRows },
-      { data: deptSumRows },
-      { data: monthScoreRows },
       { data: campaignRows },
-      { data: leaderRows },
     ] = await Promise.all([
       supabase.from("departments").select("*").order("sort_order"),
       supabase.from("profiles").select("*").eq("active", true),
-      supabase.from("kpi_definitions").select("*").eq("active", true).eq("status", "active"),
-      supabase
-        .from("v_weekly_score")
-        .select("*")
-        .eq("year", year)
-        .eq("month", month)
-        .eq("week", week),
-      supabase
-        .from("v_kpi_status")
-        .select("*")
-        .eq("year", year)
-        .eq("month", month)
-        .eq("week", week),
       supabase
         .from("v_week_summary")
         .select("*")
@@ -127,35 +93,15 @@ export default function DashboardUtama() {
         .eq("month", month)
         .eq("week", week)
         .eq("status", "tangguh"),
-      supabase
-        .from("v_dept_summary")
-        .select("*")
-        .eq("year", year)
-        .eq("month", month)
-        .eq("week", week),
-      supabase.from("v_weekly_score").select("*").eq("year", year).eq("month", month),
       supabase.from("campaigns").select("*").eq("year", year).eq("month", month),
-      supabase
-        .from("v_leaderboard")
-        .select("*")
-        .eq("year", year)
-        .eq("month", month)
-        .eq("week", week)
-        .order("rank"),
     ]);
 
     setDepartments((deptRows as Department[]) ?? []);
     setProfiles((profileRows as Profile[]) ?? []);
-    setKpiDefs((defRows as KpiDefinition[]) ?? []);
-    setWeeklyScores((scoreRows as VWeeklyScore[]) ?? []);
-    setKpiStatusRows((statusRows as VKpiStatus[]) ?? []);
     setWeekSummaries((summaryRows as VWeekSummary[]) ?? []);
     setSubmissions((subRows as WeeklySubmission[]) ?? []);
     setTangguhTodos((todoRows as Todo[]) ?? []);
-    setDeptSummary((deptSumRows as VDeptSummary[]) ?? []);
-    setMonthlyScores((monthScoreRows as VWeeklyScore[]) ?? []);
     setCampaigns((campaignRows as Campaign[]) ?? []);
-    setLeaderboard((leaderRows as VLeaderboard[]) ?? []);
     setLoading(false);
   }, [year, month, week, supabase]);
 
@@ -184,10 +130,6 @@ export default function DashboardUtama() {
     [filteredProfiles]
   );
 
-  const filteredScores = useMemo(
-    () => weeklyScores.filter((r) => filteredUserIds.has(r.user_id)),
-    [weeklyScores, filteredUserIds]
-  );
   const filteredSummaries = useMemo(
     () => weekSummaries.filter((r) => filteredUserIds.has(r.user_id)),
     [weekSummaries, filteredUserIds]
@@ -200,122 +142,55 @@ export default function DashboardUtama() {
     () => tangguhTodos.filter((r) => filteredUserIds.has(r.user_id)),
     [tangguhTodos, filteredUserIds]
   );
-  const filteredKpiStatus = useMemo(
-    () => kpiStatusRows.filter((r) => filteredUserIds.has(r.user_id)),
-    [kpiStatusRows, filteredUserIds]
-  );
-  const filteredDeptSummary = useMemo(
-    () => deptSummary.filter((r) => !deptFilter || r.dept_code === deptFilter),
-    [deptSummary, deptFilter]
-  );
 
-  // ---- Stat card 1: Skor Keseluruhan ----
-  const overallScore = avg(
-    filteredScores.map((s) => s.kpi_score ?? 0).filter((_, i) => filteredScores[i].kpi_score !== null)
-  );
-  const scoreStatus = scoreStatusLabel(overallScore);
-
-  // ---- Stat card 2: KPI Dicapai ----
-  const totalAchieved = filteredScores.reduce((sum, s) => sum + (s.kpi_achieved ?? 0), 0);
-  const totalFilled = filteredScores.reduce((sum, s) => sum + (s.kpi_filled ?? 0), 0);
-
-  // ---- Stat card 3: To-Do Siap ----
+  // ---- Stat card 1: To-Do Siap ----
   const todoPct = avg(filteredSummaries.map((s) => s.pct ?? 0));
   const todoSiap = filteredSummaries.reduce((sum, s) => sum + s.siap, 0);
   const todoTotal = filteredSummaries.reduce((sum, s) => sum + s.total, 0);
 
-  // ---- Stat card 4: Data KPI Diisi ----
-  const defsByPosition = useMemo(() => {
-    const map = new Map<string, number>();
-    kpiDefs.forEach((d) => map.set(d.position_code, (map.get(d.position_code) ?? 0) + 1));
-    return map;
-  }, [kpiDefs]);
-  const totalExpectedEntries = filteredProfiles.reduce(
-    (sum, p) => sum + (p.position_code ? defsByPosition.get(p.position_code) ?? 0 : 0),
-    0
-  );
-  const filledEntries = filteredKpiStatus.filter((r) => r.actual !== null).length;
-  const submissionRate =
-    totalExpectedEntries > 0 ? (filledEntries / totalExpectedEntries) * 100 : null;
-
-  // ---- Stat card 5: Hantar Tepat Masa ----
+  // ---- Stat card 2: Hantar Tepat Masa ----
   const onTimeCount = filteredSubmissions.filter((s) => s.on_time).length;
   const submittedCount = filteredSubmissions.filter((s) => s.submitted_at).length;
   const onTimeRate =
     filteredProfiles.length > 0 ? (onTimeCount / filteredProfiles.length) * 100 : null;
 
-  // ---- Stat card 6: Isu Perlu Tindakan ----
-  const lowKpiWithRemark = filteredKpiStatus.filter(
-    (r) => (r.status === "oren" || r.status === "merah") && (r.remark ?? "").trim().length > 0
-  ).length;
-  const isuCount = filteredTangguh.length + lowKpiWithRemark;
+  // ---- Stat card 3: Isu Perlu Tindakan ----
+  const isuCount = filteredTangguh.length;
 
-  // ---- Bar / Radar chart data (per department) ----
-  const barData: ChartDatum[] = useMemo(
-    () =>
-      filteredDeptSummary
-        .map((d) => ({
-          code: d.dept_code ?? "-",
-          label:
-            departments.find((dep) => dep.code === d.dept_code)?.short_name ??
-            d.dept_code ??
-            "-",
-          value: d.avg_score ?? 0,
-          color: deptColor.get(d.dept_code ?? "") ?? "#94a3b8",
-        }))
-        .sort(
-          (a, b) =>
-            (departments.find((d) => d.code === a.code)?.sort_order ?? 0) -
-            (departments.find((d) => d.code === b.code)?.sort_order ?? 0)
-        ),
-    [filteredDeptSummary, departments, deptColor]
-  );
-
-  // ---- Line chart: trend across M1-M4 for the month ----
-  const lineSeries: SeriesDatum[] = useMemo(() => {
-    const byDept = new Map<string, (number | null)[]>();
-    departments.forEach((d) => byDept.set(d.code, [null, null, null, null]));
-    const overall: (number | null)[] = [null, null, null, null];
-
-    for (let w = 1; w <= 4; w++) {
-      const rowsThisWeek = monthlyScores.filter(
-        (r) => r.week === w && filteredUserIds.has(r.user_id)
-      );
-      if (rowsThisWeek.length > 0) {
-        overall[w - 1] = Number(
-          (avg(rowsThisWeek.map((r) => r.kpi_score ?? 0)) ?? 0).toFixed(1)
-        );
-      }
-      departments.forEach((d) => {
-        if (deptFilter && d.code !== deptFilter) return;
-        const deptRows = rowsThisWeek.filter((r) => r.dept_code === d.code);
-        if (deptRows.length > 0) {
-          const arr = byDept.get(d.code)!;
-          arr[w - 1] = Number((avg(deptRows.map((r) => r.kpi_score ?? 0)) ?? 0).toFixed(1));
-        }
-      });
-    }
-
-    const series: SeriesDatum[] = departments
-      .filter((d) => !deptFilter || d.code === deptFilter)
-      .map((d) => ({
-        code: d.code,
-        label: d.short_name,
-        color: d.color,
-        values: byDept.get(d.code) ?? [null, null, null, null],
-      }));
-
-    series.push({
-      code: "OVERALL",
-      label: "Keseluruhan",
-      color: "#F9F9FA",
-      values: overall,
+  // ---- Ringkasan Jabatan: to-do completion per department ----
+  const deptCompletion = useMemo(() => {
+    const grouped = new Map<string, number[]>();
+    filteredSummaries.forEach((s) => {
+      const code = profileMap.get(s.user_id)?.dept_code ?? "-";
+      const arr = grouped.get(code) ?? [];
+      arr.push(s.pct ?? 0);
+      grouped.set(code, arr);
     });
+    return departments
+      .filter((d) => grouped.has(d.code))
+      .map((d) => {
+        const pcts = grouped.get(d.code) ?? [];
+        return {
+          code: d.code,
+          name: d.name,
+          color: d.color,
+          members: pcts.length,
+          avgPct: avg(pcts),
+        };
+      })
+      .sort((a, b) => (b.avgPct ?? -1) - (a.avgPct ?? -1));
+  }, [filteredSummaries, profileMap, departments]);
 
-    return series;
-  }, [monthlyScores, departments, filteredUserIds, deptFilter]);
-
-  const radarData: ChartDatum[] = barData;
+  // ---- Leaderboard Pantas: top-3 by to-do completion ----
+  const todoLeaders = useMemo(
+    () =>
+      filteredSummaries
+        .map((s) => ({ summary: s, profile: profileMap.get(s.user_id) }))
+        .filter((r) => r.profile)
+        .sort((a, b) => (b.summary.pct ?? 0) - (a.summary.pct ?? 0))
+        .slice(0, 3),
+    [filteredSummaries, profileMap]
+  );
 
   const todoTableRows = useMemo(
     () =>
@@ -339,7 +214,7 @@ export default function DashboardUtama() {
         </p>
         <h2 className="text-xl font-bold text-white">Dashboard Utama</h2>
         <p className="text-sm text-muted">
-          Pantauan prestasi keseluruhan pasukan Masdora.
+          Pantauan penyiapan to-do dan kempen pasukan Masdora.
         </p>
       </div>
 
@@ -395,104 +270,46 @@ export default function DashboardUtama() {
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <StatCard
               index={0}
-              icon="🏅"
-              label="Skor Keseluruhan"
-              value={overallScore !== null ? overallScore.toFixed(1) : "-"}
-              caption={scoreStatus.label}
-              pill={scoreStatus.pill}
-            />
-            <StatCard
-              index={1}
-              icon="🎯"
-              label="KPI Dicapai"
-              value={`${totalAchieved}/${totalFilled}`}
-              caption="KPI dicapai"
-            />
-            <StatCard
-              index={2}
               icon="📋"
               label="To-Do Siap"
               value={todoPct !== null ? `${todoPct.toFixed(0)}%` : "-"}
               caption={`${todoSiap}/${todoTotal} kerja siap`}
             />
             <StatCard
-              index={3}
-              icon="📝"
-              label="Data KPI Diisi"
-              value={submissionRate !== null ? `${submissionRate.toFixed(0)}%` : "-"}
-              caption={`${filledEntries}/${totalExpectedEntries} diisi`}
-            />
-            <StatCard
-              index={4}
+              index={1}
               icon="⏱️"
               label="Hantar Tepat Masa"
               value={onTimeRate !== null ? `${onTimeRate.toFixed(0)}%` : "-"}
               caption={`${onTimeCount}/${submittedCount} hantar tepat`}
             />
             <StatCard
-              index={5}
+              index={2}
               icon="⚠️"
               label="Isu Perlu Tindakan"
               value={String(isuCount)}
-              caption="tugasan/KPI perlu tindakan"
+              caption="tugasan tangguh perlu tindakan"
             />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <motion.div {...cardMotion} className="card">
-              <h3 className="mb-3 font-semibold text-white">
-                Prestasi Mengikut Jabatan
-              </h3>
-              <BarChart data={barData} />
-            </motion.div>
-            <motion.div
-              {...cardMotion}
-              transition={{ ...cardMotion.transition, delay: 0.06 }}
-              className="card flex flex-col items-center justify-center"
-            >
-              <h3 className="mb-3 self-start font-semibold text-white">
-                Pencapaian Minggu {week}
-              </h3>
-              <DonutChart pct={overallScore ?? 0} />
-            </motion.div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <motion.div {...cardMotion} className="card">
-              <h3 className="mb-3 font-semibold text-white">Trend Mingguan</h3>
-              <LineChart series={lineSeries} />
-            </motion.div>
-            <motion.div
-              {...cardMotion}
-              transition={{ ...cardMotion.transition, delay: 0.06 }}
-              className="card"
-            >
-              <h3 className="mb-3 font-semibold text-white">Peta Prestasi</h3>
-              <RadarChart data={radarData} />
-            </motion.div>
           </div>
 
           <div>
             <h3 className="mb-2 font-semibold text-white">Ringkasan Jabatan</h3>
+            <p className="mb-2 text-xs text-slate-500">
+              Purata penyiapan to-do mengikut jabatan bagi Minggu {week}.
+            </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredDeptSummary.length === 0 ? (
+              {deptCompletion.length === 0 ? (
                 <motion.div {...cardMotion} className="card text-sm text-muted">
                   Tiada data jabatan untuk tempoh ini.
                 </motion.div>
               ) : (
-                filteredDeptSummary.map((d, i) => {
-                  const dept = departments.find((x) => x.code === d.dept_code);
-                  const status = scoreStatusLabel(d.avg_score);
-                  const deptSubs = submissions.filter(
-                    (s) => profileMap.get(s.user_id)?.dept_code === d.dept_code
-                  );
-                  const onTime = deptSubs.filter((s) => s.on_time).length;
+                deptCompletion.map((d, i) => {
+                  const tier = completionTier(d.avgPct);
                   return (
                     <motion.div
-                      key={d.dept_code ?? "-"}
+                      key={d.code}
                       initial={{ opacity: 0, y: 14 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{
@@ -504,24 +321,16 @@ export default function DashboardUtama() {
                     >
                       <span
                         className="h-8 w-1.5 flex-shrink-0 rounded-full"
-                        style={{ background: dept?.color ?? "#94a3b8" }}
+                        style={{ background: d.color }}
                       />
                       <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-bold text-slate-100">
-                              {dept?.name ?? d.dept_code}
-                            </p>
-                            <p className="text-[11px] text-slate-500">
-                              {d.headcount} ahli · {onTime}/{deptSubs.length || d.headcount} tepat masa
-                            </p>
-                          </div>
-                        </div>
+                        <p className="font-bold text-slate-100">{d.name}</p>
+                        <p className="text-[11px] text-slate-500">{d.members} ahli</p>
                         <div className="mt-2 flex items-center justify-between">
                           <span className="text-lg font-black text-white">
-                            {d.avg_score ?? "-"}%
+                            {d.avgPct !== null ? `${d.avgPct.toFixed(0)}%` : "-"}
                           </span>
-                          <StatusBadge status={status.pill} />
+                          <span className={`pill pill-${tier.pill}`}>{tier.label}</span>
                         </div>
                       </div>
                     </motion.div>
@@ -572,15 +381,18 @@ export default function DashboardUtama() {
 
           <div>
             <h3 className="mb-2 font-semibold text-white">Leaderboard Pantas</h3>
-            {leaderboard.length === 0 ? (
+            <p className="mb-2 text-xs text-slate-500">
+              Tiga teratas penyiapan to-do bagi Minggu {week}.
+            </p>
+            {todoLeaders.length === 0 ? (
               <motion.div {...cardMotion} className="card text-sm text-muted">
                 Tiada data leaderboard untuk tempoh ini.
               </motion.div>
             ) : (
               <div className="card divide-y divide-white/5">
-                {leaderboard.slice(0, 3).map((row, i) => (
+                {todoLeaders.map(({ summary, profile }, i) => (
                   <motion.div
-                    key={row.user_id}
+                    key={summary.user_id}
                     initial={{ opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{
@@ -590,22 +402,22 @@ export default function DashboardUtama() {
                     }}
                     className="flex items-center gap-3 rounded-lg px-2 py-2 transition first:pt-2 last:pb-2 hover:bg-white/5"
                   >
-                    <span className="w-6 text-lg">{MEDALS[i] ?? `#${row.rank}`}</span>
+                    <span className="w-6 text-lg">{MEDALS[i] ?? `#${i + 1}`}</span>
                     <AvatarInitials
-                      name={row.full_name}
-                      deptColor={deptColor.get(row.dept_code ?? "")}
+                      name={profile!.full_name}
+                      deptColor={deptColor.get(profile!.dept_code ?? "")}
                       size={32}
                     />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-white">
-                        {row.full_name}
+                        {profile!.full_name}
                       </p>
                       <p className="truncate text-xs text-muted">
-                        {row.position_code ?? "-"}
+                        {profile!.position_code ?? "-"}
                       </p>
                     </div>
                     <span className="text-sm font-bold text-brand-400">
-                      {row.total_score}
+                      {summary.pct ?? 0}%
                     </span>
                   </motion.div>
                 ))}
