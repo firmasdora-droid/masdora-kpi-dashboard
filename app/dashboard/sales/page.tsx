@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { getCurrentYear, getCurrentMonth, monthName } from "@/lib/period";
 import { canKeyInSale, isManager, isCeo, type Role } from "@/lib/roles";
 import DataTable, { DataTableColumn } from "@/components/DataTable";
 import type {
   Profile,
+  Sale,
   SaleLookup,
   SalePlatform,
-  VSalesMonthly,
 } from "@/types/database";
 
 const PLATFORMS: SalePlatform[] = [
@@ -27,15 +26,23 @@ const cardMotion = {
   transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
 };
 
-interface MonthlyRow extends VSalesMonthly {
+interface SaleRow extends Sale {
   full_name?: string;
+}
+
+function formatRM(n: number | string | null | undefined): string {
+  if (n === null || n === undefined || n === "") return "-";
+  return `RM ${Number(n).toLocaleString("ms-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 export default function SalesPage() {
   const supabase = createClient();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [lookups, setLookups] = useState<SaleLookup[]>([]);
-  const [monthly, setMonthly] = useState<MonthlyRow[]>([]);
+  const [recent, setRecent] = useState<SaleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -77,35 +84,37 @@ export default function SalesPage() {
       .order("name");
     setLookups((lookupRows as SaleLookup[]) ?? []);
 
-    const year = getCurrentYear();
-    const month = getCurrentMonth();
-
     if (prof && (isManager(prof.role) || isCeo(prof.role))) {
-      const [{ data: salesRows }, { data: profiles }] = await Promise.all([
+      const [{ data: saleRows }, { data: profiles }] = await Promise.all([
         supabase
-          .from("v_sales_monthly")
+          .from("sales")
           .select("*")
-          .eq("year", year)
-          .eq("month", month),
+          .order("date", { ascending: false })
+          .limit(50),
         supabase.from("profiles").select("*"),
       ]);
       const profileMap = new Map(
         ((profiles as Profile[]) ?? []).map((p) => [p.id, p.full_name])
       );
-      setMonthly(
-        ((salesRows as VSalesMonthly[]) ?? []).map((r) => ({
+      setRecent(
+        ((saleRows as Sale[]) ?? []).map((r) => ({
           ...r,
           full_name: profileMap.get(r.user_id) ?? r.user_id,
         }))
       );
     } else if (prof) {
-      const { data: salesRows } = await supabase
-        .from("v_sales_monthly")
+      const { data: saleRows } = await supabase
+        .from("sales")
         .select("*")
         .eq("user_id", prof.id)
-        .eq("year", year)
-        .eq("month", month);
-      setMonthly((salesRows as VSalesMonthly[]) ?? []);
+        .order("date", { ascending: false })
+        .limit(50);
+      setRecent(
+        ((saleRows as Sale[]) ?? []).map((r) => ({
+          ...r,
+          full_name: prof.full_name,
+        }))
+      );
     }
 
     setLoading(false);
@@ -162,18 +171,25 @@ export default function SalesPage() {
   const hosts = lookups.filter((l) => l.type === "host");
   const accounts = lookups.filter((l) => l.type === "account");
 
-  const monthlyColumns: DataTableColumn<MonthlyRow>[] = [
+  const recentColumns: DataTableColumn<SaleRow>[] = [
+    { key: "date", header: "Tarikh" },
     ...(profile && (isManager(profile.role) || isCeo(profile.role))
-      ? [{ key: "full_name", header: "Nama" } as DataTableColumn<MonthlyRow>]
+      ? [{ key: "full_name", header: "Nama" } as DataTableColumn<SaleRow>]
       : []),
-    { key: "month", header: "Bulan", render: (r) => monthName(r.month) },
     {
-      key: "total_rm",
+      key: "amount_rm",
       header: "Jumlah (RM)",
-      render: (r) => Number(r.total_rm).toLocaleString("ms-MY"),
+      render: (r) => formatRM(r.amount_rm),
     },
-    { key: "entries", header: "Bilangan Rekod" },
+    { key: "platform", header: "Platform" },
+    {
+      key: "note",
+      header: "Catatan",
+      render: (r) => r.note || "-",
+    },
   ];
+
+  const totalRecent = recent.reduce((s, r) => s + Number(r.amount_rm ?? 0), 0);
 
   if (loading) {
     return <p className="text-sm text-muted">Memuatkan...</p>;
@@ -333,14 +349,22 @@ export default function SalesPage() {
       )}
 
       <div>
-        <h3 className="mb-2 font-semibold text-white">
-          Jumlah Jualan Bulan Ini
-        </h3>
-        <DataTable<MonthlyRow>
-          columns={monthlyColumns}
-          rows={monthly}
-          rowKey={(r) => r.user_id + r.month_start}
-          emptyMessage="Tiada rekod jualan bulan ini."
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-semibold text-white">Rekod Jualan Terkini</h3>
+          {recent.length > 0 && (
+            <p className="text-sm text-muted">
+              {recent.length} rekod · Jumlah{" "}
+              <span className="font-bold text-brand-400">
+                {formatRM(totalRecent)}
+              </span>
+            </p>
+          )}
+        </div>
+        <DataTable<SaleRow>
+          columns={recentColumns}
+          rows={recent}
+          rowKey={(r) => String(r.id)}
+          emptyMessage="Belum ada rekod jualan. Isi borang di atas untuk mula merekod."
         />
       </div>
     </div>
