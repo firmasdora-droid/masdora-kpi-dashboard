@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
 
 interface CsIssue {
   monthTab: string;
@@ -18,6 +19,29 @@ interface CsIssue {
 const SHEET_URL =
   "https://docs.google.com/spreadsheets/d/1TqDoXOfECRElTd2QOKFPH9OmFKP2flQGqke0dp47PYA/edit";
 
+/** Nama sebenar bagi kod handler. */
+const HANDLER_NAMES: Record<string, string> = {
+  MAI: "Maisarah",
+  TI: "Najjati",
+  HAWA: "Natasya",
+};
+
+type StatusKey = "baru" | "proses" | "selesai" | "perhatian";
+
+const STATUSES: {
+  key: StatusKey;
+  label: string;
+  pill: string;
+  icon: string;
+}[] = [
+  { key: "baru", label: "Baru", pill: "pill-kosong", icon: "🆕" },
+  { key: "proses", label: "Sedang Diuruskan", pill: "pill-kuning", icon: "⏳" },
+  { key: "selesai", label: "Selesai", pill: "pill-hijau", icon: "✅" },
+  { key: "perhatian", label: "Perlu Perhatian", pill: "pill-merah", icon: "⚠️" },
+];
+
+const STATUS_MAP = Object.fromEntries(STATUSES.map((s) => [s.key, s]));
+
 const cardMotion = {
   initial: { opacity: 0, y: 14 },
   animate: { opacity: 1, y: 0 },
@@ -26,51 +50,106 @@ const cardMotion = {
 
 const STAT_ACCENTS = [
   "from-masdora-orange/20 to-masdora-orange/5 border-masdora-orange/25",
-  "from-masdora-olive/25 to-masdora-olive/5 border-masdora-olive/35",
   "from-masdora-yellow/18 to-masdora-yellow/5 border-masdora-yellow/25",
-  "from-masdora-gray/15 to-masdora-gray/5 border-masdora-gray/25",
+  "from-masdora-olive/25 to-masdora-olive/5 border-masdora-olive/35",
+  "from-masdora-alert/20 to-masdora-alert/5 border-masdora-alert/25",
 ];
 
+/** Kunci stabil untuk padankan isu dari sheet dengan status dalam database. */
+function keyOf(i: CsIssue) {
+  return `${i.monthTab}-${i.rowIndex}`;
+}
+
+/** Status awal kalau team belum tanda apa-apa lagi. */
+function defaultStatus(i: CsIssue): StatusKey {
+  return i.solution.trim() ? "selesai" : "baru";
+}
+
 export default function IsuPelangganPage() {
+  const supabase = createClient();
+
   const [issues, setIssues] = useState<CsIssue[]>([]);
   const [tabs, setTabs] = useState<string[]>([]);
+  const [statuses, setStatuses] = useState<Record<string, StatusKey>>({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [monthFilter, setMonthFilter] = useState("");
   const [handlerFilter, setHandlerFilter] = useState("");
-  const [platformFilter, setPlatformFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/cs-issues", { cache: "no-store" });
-      const json = await res.json();
-      if (!json.ok) {
-        setError(json.error ?? "Gagal memuatkan data.");
+      const [sheetRes, { data: statusRows }] = await Promise.all([
+        fetch("/api/cs-issues", { cache: "no-store" }).then((r) => r.json()),
+        supabase.from("cs_issue_status").select("source_key, status"),
+      ]);
+
+      if (!sheetRes.ok) {
+        setError(sheetRes.error ?? "Gagal memuatkan data.");
         setIssues([]);
       } else {
-        setIssues(json.issues as CsIssue[]);
-        setTabs((json.tabs as string[]) ?? []);
+        setIssues(sheetRes.issues as CsIssue[]);
+        setTabs((sheetRes.tabs as string[]) ?? []);
       }
+
+      const map: Record<string, StatusKey> = {};
+      ((statusRows as { source_key: string; status: string }[]) ?? []).forEach(
+        (r) => {
+          map[r.source_key] = r.status as StatusKey;
+        }
+      );
+      setStatuses(map);
     } catch {
       setError("Gagal menghubungi Google Sheet.");
     }
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  function statusOf(i: CsIssue): StatusKey {
+    return statuses[keyOf(i)] ?? defaultStatus(i);
+  }
+
+  async function setStatus(issue: CsIssue, next: StatusKey) {
+    const key = keyOf(issue);
+    setSavingKey(key);
+    // Kemas skrin dahulu supaya terasa pantas
+    setStatuses((prev) => ({ ...prev, [key]: next }));
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { error: upsertError } = await supabase
+      .from("cs_issue_status")
+      .upsert(
+        {
+          source_key: key,
+          status: next,
+          updated_by: user?.id ?? null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "source_key" }
+      );
+
+    setSavingKey(null);
+
+    if (upsertError) {
+      setError("Gagal menyimpan status: " + upsertError.message);
+      load();
+    }
+  }
+
   const handlers = useMemo(
     () => Array.from(new Set(issues.map((i) => i.handler).filter(Boolean))).sort(),
-    [issues]
-  );
-  const platforms = useMemo(
-    () => Array.from(new Set(issues.map((i) => i.platform).filter(Boolean))).sort(),
     [issues]
   );
 
@@ -79,19 +158,30 @@ export default function IsuPelangganPage() {
     return issues.filter((i) => {
       if (monthFilter && i.monthTab !== monthFilter) return false;
       if (handlerFilter && i.handler !== handlerFilter) return false;
-      if (platformFilter && i.platform !== platformFilter) return false;
+      if (statusFilter && statusOf(i) !== statusFilter) return false;
       if (q) {
-        const hay = `${i.username} ${i.description} ${i.solution} ${i.platform} ${i.handler}`.toLowerCase();
+        const hay =
+          `${i.username} ${i.description} ${i.solution} ${i.platform} ${i.handler}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [issues, monthFilter, handlerFilter, platformFilter, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issues, monthFilter, handlerFilter, statusFilter, search, statuses]);
 
-  const settled = filtered.filter((i) => i.solution.trim().length > 0).length;
-  const pending = filtered.length - settled;
-  const settledPct =
-    filtered.length > 0 ? Math.round((settled / filtered.length) * 100) : 0;
+  const counts = useMemo(() => {
+    const c: Record<StatusKey, number> = {
+      baru: 0,
+      proses: 0,
+      selesai: 0,
+      perhatian: 0,
+    };
+    filtered.forEach((i) => {
+      c[statusOf(i)]++;
+    });
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, statuses]);
 
   return (
     <div className="space-y-6">
@@ -99,8 +189,7 @@ export default function IsuPelangganPage() {
         <div>
           <h2 className="text-xl font-bold text-white">Isu Pelanggan</h2>
           <p className="text-sm text-muted">
-            Terus dari Google Sheet &ldquo;Customer Issue Report&rdquo; — semua bulan,
-            sentiasa terkini.
+            Isu dari Google Sheet · status boleh ditanda terus di sini.
           </p>
         </div>
         <div className="flex gap-2">
@@ -127,39 +216,37 @@ export default function IsuPelangganPage() {
         </motion.div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          index={0}
-          icon="📋"
-          label="Jumlah Isu"
-          value={String(filtered.length)}
-          caption={
-            monthFilter || handlerFilter || platformFilter || search
-              ? `daripada ${issues.length} keseluruhan`
-              : "semua bulan"
-          }
-        />
-        <StatCard
-          index={1}
-          icon="✅"
-          label="Ada Penyelesaian"
-          value={String(settled)}
-          caption={`${settledPct}% direkod selesai`}
-        />
-        <StatCard
-          index={2}
-          icon="⏳"
-          label="Belum Direkod"
-          value={String(pending)}
-          caption="ruangan solution kosong"
-        />
-        <StatCard
-          index={3}
-          icon="👥"
-          label="Handler Aktif"
-          value={String(handlers.length)}
-          caption={handlers.join(", ") || "-"}
-        />
+      {/* Kad status — klik untuk tapis */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {STATUSES.map((s, i) => {
+          const active = statusFilter === s.key;
+          return (
+            <motion.button
+              key={s.key}
+              {...cardMotion}
+              transition={{ ...cardMotion.transition, delay: i * 0.06 }}
+              onClick={() => setStatusFilter(active ? "" : s.key)}
+              className={`rounded-2xl border bg-gradient-to-br p-4 text-left transition ${
+                STAT_ACCENTS[i]
+              } ${active ? "ring-2 ring-white/40" : "hover:brightness-125"}`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                  {s.label}
+                </span>
+                <span className="text-lg" aria-hidden>
+                  {s.icon}
+                </span>
+              </div>
+              <p className="mt-2 text-2xl font-black text-white">
+                {counts[s.key]}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                {active ? "klik untuk buang tapisan" : "klik untuk tapis"}
+              </p>
+            </motion.button>
+          );
+        })}
       </div>
 
       <motion.div {...cardMotion} className="card flex flex-wrap items-end gap-4">
@@ -188,22 +275,7 @@ export default function IsuPelangganPage() {
             <option value="">Semua Handler</option>
             {handlers.map((h) => (
               <option key={h} value={h}>
-                {h}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label">Platform</label>
-          <select
-            className="input"
-            value={platformFilter}
-            onChange={(e) => setPlatformFilter(e.target.value)}
-          >
-            <option value="">Semua Platform</option>
-            {platforms.map((p) => (
-              <option key={p} value={p}>
-                {p}
+                {HANDLER_NAMES[h] ?? h}
               </option>
             ))}
           </select>
@@ -220,93 +292,88 @@ export default function IsuPelangganPage() {
       </motion.div>
 
       {loading ? (
-        <p className="text-sm text-muted">Memuatkan data dari Google Sheet...</p>
+        <p className="text-sm text-muted">Memuatkan data...</p>
       ) : filtered.length === 0 ? (
         <motion.div {...cardMotion} className="card text-center text-sm text-muted">
           Tiada isu yang sepadan dengan penapis ini.
         </motion.div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((issue, i) => (
-            <motion.div
-              key={`${issue.monthTab}-${issue.rowIndex}`}
-              {...cardMotion}
-              transition={{ ...cardMotion.transition, delay: Math.min(i * 0.03, 0.4) }}
-              className="card"
-            >
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="pill pill-oren">{issue.handler || "—"}</span>
-                <span className="pill pill-kosong">{issue.platform || "—"}</span>
-                <span className="text-xs text-slate-400">
-                  {issue.reportedAt || issue.rawDate || "Tiada tarikh"} ·{" "}
-                  {issue.monthTab}
-                </span>
-                <span
-                  className={`pill ml-auto ${
-                    issue.solution.trim() ? "pill-hijau" : "pill-kuning"
-                  }`}
-                >
-                  {issue.solution.trim() ? "Ada penyelesaian" : "Belum direkod"}
-                </span>
-              </div>
-
-              <p className="text-sm font-bold text-slate-100">
-                {issue.username || "(tiada username)"}
-              </p>
-
-              <p className="mt-1 whitespace-pre-line text-sm text-slate-300">
-                {issue.description || "-"}
-              </p>
-
-              {issue.solution.trim() && (
-                <div className="mt-3 rounded-lg border border-masdora-olive/30 bg-masdora-olive/10 p-3">
-                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-masdora-olive">
-                    Penyelesaian
-                  </p>
-                  <p className="whitespace-pre-line text-sm text-slate-200">
-                    {issue.solution}
-                  </p>
+          {filtered.map((issue, i) => {
+            const key = keyOf(issue);
+            const current = statusOf(issue);
+            const meta = STATUS_MAP[current];
+            return (
+              <motion.div
+                key={key}
+                {...cardMotion}
+                transition={{
+                  ...cardMotion.transition,
+                  delay: Math.min(i * 0.03, 0.4),
+                }}
+                className="card"
+              >
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="pill pill-oren">
+                    {HANDLER_NAMES[issue.handler] || issue.handler || "—"}
+                  </span>
+                  <span className="pill pill-kosong">{issue.platform || "—"}</span>
+                  <span className="text-xs text-slate-400">
+                    {issue.reportedAt || issue.rawDate || "Tiada tarikh"} ·{" "}
+                    {issue.monthTab}
+                  </span>
+                  <span className={`pill ml-auto ${meta.pill}`}>
+                    {meta.icon} {meta.label}
+                  </span>
                 </div>
-              )}
-            </motion.div>
-          ))}
+
+                <p className="text-sm font-bold text-slate-100">
+                  {issue.username || "(tiada username)"}
+                </p>
+
+                <p className="mt-1 whitespace-pre-line text-sm text-slate-300">
+                  {issue.description || "-"}
+                </p>
+
+                {issue.solution.trim() && (
+                  <div className="mt-3 rounded-lg border border-masdora-olive/30 bg-masdora-olive/10 p-3">
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-masdora-olive">
+                      Penyelesaian
+                    </p>
+                    <p className="whitespace-pre-line text-sm text-slate-200">
+                      {issue.solution}
+                    </p>
+                  </div>
+                )}
+
+                {/* Tukar status */}
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Tukar status:
+                  </span>
+                  {STATUSES.map((s) => (
+                    <button
+                      key={s.key}
+                      onClick={() => setStatus(issue, s.key)}
+                      disabled={savingKey === key}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                        current === s.key
+                          ? "bg-white/15 text-white"
+                          : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                      } disabled:opacity-50`}
+                    >
+                      {s.icon} {s.label}
+                    </button>
+                  ))}
+                  {savingKey === key && (
+                    <span className="text-xs text-slate-500">Menyimpan...</span>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </div>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  caption,
-  index = 0,
-}: {
-  icon: string;
-  label: string;
-  value: string;
-  caption: string;
-  index?: number;
-}) {
-  return (
-    <motion.div
-      {...cardMotion}
-      transition={{ ...cardMotion.transition, delay: index * 0.06 }}
-      className={`rounded-2xl border bg-gradient-to-br p-4 ${
-        STAT_ACCENTS[index % STAT_ACCENTS.length]
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
-          {label}
-        </span>
-        <span className="text-lg" aria-hidden>
-          {icon}
-        </span>
-      </div>
-      <p className="mt-2 text-2xl font-black text-white">{value}</p>
-      <p className="mt-1 truncate text-[11px] text-slate-400">{caption}</p>
-    </motion.div>
   );
 }
