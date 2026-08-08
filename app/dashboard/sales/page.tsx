@@ -46,6 +46,8 @@ export default function SalesPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmId, setConfirmId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
@@ -167,6 +169,37 @@ export default function SalesPage() {
     load();
   }
 
+  async function handleDelete(id: number) {
+    setMessage(null);
+    setDeletingId(id);
+
+    // .select() supaya kita tahu sama ada baris betul-betul dipadam.
+    // Kalau RLS menghalang, Supabase pulangkan array kosong tanpa error.
+    const { data, error } = await supabase
+      .from("sales")
+      .delete()
+      .eq("id", id)
+      .select();
+
+    setDeletingId(null);
+    setConfirmId(null);
+
+    if (error) {
+      setMessage("Gagal memadam rekod: " + error.message);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      setMessage(
+        "Rekod tidak dipadam — anda tiada kebenaran untuk memadam rekod ini. Sila hubungi manager."
+      );
+      return;
+    }
+
+    setMessage("Rekod jualan telah dipadam.");
+    load();
+  }
+
   const teams = lookups.filter((l) => l.type === "team");
   const hosts = lookups.filter((l) => l.type === "host");
   const accounts = lookups.filter((l) => l.type === "account");
@@ -186,6 +219,43 @@ export default function SalesPage() {
       key: "note",
       header: "Catatan",
       render: (r) => r.note || "-",
+    },
+    {
+      key: "id",
+      header: "",
+      render: (r) => {
+        const id = Number(r.id);
+        if (deletingId === id) {
+          return <span className="text-xs text-muted">Memadam...</span>;
+        }
+        if (confirmId === id) {
+          return (
+            <span className="flex items-center gap-2">
+              <button
+                onClick={() => handleDelete(id)}
+                className="rounded-lg border border-red-500/40 bg-red-500/15 px-2.5 py-1 text-xs font-bold text-red-300 transition hover:bg-red-500/25"
+              >
+                Ya, padam
+              </button>
+              <button
+                onClick={() => setConfirmId(null)}
+                className="text-xs text-slate-400 hover:text-slate-200"
+              >
+                Batal
+              </button>
+            </span>
+          );
+        }
+        return (
+          <button
+            onClick={() => setConfirmId(id)}
+            className="rounded-lg border border-white/10 px-2.5 py-1 text-xs font-semibold text-slate-400 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
+            title="Padam rekod ini"
+          >
+            Padam
+          </button>
+        );
+      },
     },
   ];
 
