@@ -94,16 +94,28 @@ export default function PrestasiKontenPage() {
     load();
   }, [load]);
 
-  // Bulan terkini yang ada data dipilih automatik
+  // Pilih bulan yang paling banyak video BERDATA (ada tontonan direkod),
+  // bukan sekadar bulan terakhir yang ada baris kosong.
   useEffect(() => {
     if (monthFilter || posts.length === 0 || tabs.length === 0) return;
-    const withData = tabs.filter((t) => posts.some((p) => p.monthTab === t));
-    if (withData.length > 0) setMonthFilter(withData[withData.length - 1]);
+    // Ambil bulan TERKINI yang benar-benar ada tontonan direkod.
+    let best = "";
+    tabs.forEach((t) => {
+      const hasViews = posts.some((p) => p.monthTab === t && p.views > 0);
+      if (hasViews) best = t;
+    });
+    if (!best) {
+      const withAny = tabs.filter((t) => posts.some((p) => p.monthTab === t));
+      best = withAny[withAny.length - 1] ?? "";
+    }
+    if (best) setMonthFilter(best);
   }, [posts, tabs, monthFilter]);
 
-  // Ahli biasa lihat prestasi sendiri secara lalai
+  // Ahli biasa lihat prestasi sendiri secara lalai.
+  // Manager/CEO lihat semua handler supaya nampak gambaran penuh.
   useEffect(() => {
     if (handlerFilter || !profile || posts.length === 0) return;
+    if (profile.role === "manager" || profile.role === "ceo") return;
     const first = profile.full_name.split(/\s+/)[0].toLowerCase();
     const mine = posts.find((p) => p.handler.toLowerCase().includes(first));
     if (mine) setHandlerFilter(mine.handler);
@@ -135,6 +147,11 @@ export default function PrestasiKontenPage() {
   const totalShares = filtered.reduce((s, p) => s + p.shares, 0);
   const avgViews =
     filtered.length > 0 ? Math.round(totalViews / filtered.length) : 0;
+
+  // Engagement = jumlah interaksi (like + komen + share) berbanding tontonan
+  const totalEngagement = totalLikes + totalComments + totalShares;
+  const engagementRate =
+    totalViews > 0 ? (totalEngagement / totalViews) * 100 : 0;
 
   /** Prestasi ikut akaun (untuk carta bar). */
   const perAccount = useMemo(() => {
@@ -218,7 +235,7 @@ export default function PrestasiKontenPage() {
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
           { label: "Like", value: totalLikes, icon: "❤️" },
           { label: "Komen", value: totalComments, icon: "💬" },
@@ -239,6 +256,25 @@ export default function PrestasiKontenPage() {
             <p className="mt-2 text-2xl font-black text-white">{nf(s.value)}</p>
           </motion.div>
         ))}
+
+        <motion.div
+          {...cardMotion}
+          transition={{ ...cardMotion.transition, delay: 0.18 }}
+          className="rounded-2xl border border-masdora-olive/35 bg-gradient-to-br from-masdora-olive/25 to-masdora-olive/5 p-4"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+              Engagement
+            </span>
+            <span aria-hidden>📈</span>
+          </div>
+          <p className="mt-2 text-2xl font-black text-white">
+            {totalViews > 0 ? `${engagementRate.toFixed(2)}%` : "—"}
+          </p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            {nf(totalEngagement)} interaksi / {nf(totalViews)} tontonan
+          </p>
+        </motion.div>
       </div>
 
       <motion.div {...cardMotion} className="card flex flex-wrap items-end gap-4">
