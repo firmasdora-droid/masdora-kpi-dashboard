@@ -46,6 +46,7 @@ export default function PrestasiKontenPage() {
   const [monthFilter, setMonthFilter] = useState("");
   const [handlerFilter, setHandlerFilter] = useState("");
   const [accountFilter, setAccountFilter] = useState("");
+  const [showAll, setShowAll] = useState(false);
 
   const load = useCallback(
     async (fresh = false) => {
@@ -150,10 +151,11 @@ export default function PrestasiKontenPage() {
   }, [filtered]);
   const maxAccountViews = Math.max(1, ...perAccount.map((a) => a.views));
 
-  const topPosts = useMemo(
-    () => [...filtered].sort((a, b) => b.views - a.views).slice(0, 5),
+  const sortedAll = useMemo(
+    () => [...filtered].sort((a, b) => b.views - a.views),
     [filtered]
   );
+  const topPosts = useMemo(() => sortedAll.slice(0, 5), [sortedAll]);
 
   return (
     <div className="space-y-6">
@@ -369,55 +371,55 @@ export default function PrestasiKontenPage() {
             </motion.div>
           )}
 
+          {/* Senarai penuh disorok — buka hanya bila perlu */}
           <div>
-            <h3 className="mb-2 font-semibold text-white">
-              Semua Video ({filtered.length})
-            </h3>
-            <motion.div {...cardMotion} className="card overflow-x-auto">
-              <table className="table-base">
-                <thead>
-                  <tr>
-                    <th>Akaun</th>
-                    <th>Jenis</th>
-                    <th>Tarikh Post</th>
-                    <th>Views</th>
-                    <th>Like</th>
-                    <th>Komen</th>
-                    <th>Share</th>
-                    <th>Handler</th>
-                    <th>Link</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((p) => (
-                    <tr key={`${p.monthTab}-${p.rowIndex}`}>
-                      <td className="font-semibold text-slate-100">{p.account}</td>
-                      <td>{p.contentType || "—"}</td>
-                      <td>{p.postedAt || "—"}</td>
-                      <td className="font-bold text-brand-400">{nf(p.views)}</td>
-                      <td>{nf(p.likes)}</td>
-                      <td>{nf(p.comments)}</td>
-                      <td>{nf(p.shares)}</td>
-                      <td>{p.handler}</td>
-                      <td>
-                        {p.videoLink ? (
-                          <a
-                            href={p.videoLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-brand-400 hover:underline"
-                          >
-                            Buka ↗
-                          </a>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </motion.div>
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              className="btn-secondary"
+            >
+              {showAll
+                ? "Sembunyikan senarai penuh"
+                : `Lihat semua video (${filtered.length})`}
+            </button>
+
+            {showAll && (
+              <motion.div {...cardMotion} className="card mt-3 space-y-2">
+                {sortedAll.map((p) => (
+                  <div
+                    key={`${p.monthTab}-${p.rowIndex}`}
+                    className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-100">
+                        {p.contentType || "(tiada tajuk)"}
+                      </p>
+                      <p className="truncate text-[11px] text-slate-500">
+                        {p.postedAt || "tiada tarikh"}
+                        {!accountFilter && ` · ${p.account}`}
+                        {!handlerFilter && ` · ${p.handler}`}
+                        {p.likes > 0 && ` · ${nf(p.likes)} like`}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0 text-right">
+                      <p className="text-sm font-black text-white">
+                        {nf(p.views)}
+                      </p>
+                      <p className="text-[10px] text-slate-500">views</p>
+                    </div>
+                    {p.videoLink && (
+                      <a
+                        href={p.videoLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0 text-xs font-semibold text-brand-400 hover:underline"
+                      >
+                        Buka ↗
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </motion.div>
+            )}
           </div>
         </>
       )}
