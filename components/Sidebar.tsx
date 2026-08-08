@@ -49,6 +49,11 @@ export default function Sidebar({
 
   const manager = isManager(role);
 
+  // Pautan khas Maisarah. Dikenal pasti melalui kod handler ATAU nama,
+  // supaya ia berfungsi walaupun handler_code belum diset dalam database.
+  const isMaisarah =
+    handlerCode === "MAI" || /maisarah/i.test(fullName ?? "");
+
   const groups: NavGroup[] = [
     {
       title: "Kerja Saya",
@@ -93,8 +98,7 @@ export default function Sidebar({
           href: "https://masdora.zo.space/team/recovery-crm",
           label: "Recovery CRM",
           icon: "🔗",
-          // Hanya untuk Maisarah (handler MAI).
-          show: handlerCode === "MAI",
+          show: isMaisarah,
           external: true,
         },
       ],
