@@ -54,6 +54,16 @@ export default function Sidebar({
   const isMaisarah =
     handlerCode === "MAI" || /maisarah/i.test(fullName ?? "");
 
+  // Team Customer Service — mereka sahaja yang perlu Isu Pelanggan & Laporan Chat.
+  const isCS = ["CS_AGENT", "CS_WEB", "CS_SHOPEE", "CS_TIKTOK"].includes(
+    positionCode ?? ""
+  );
+
+  // Team konten/video/foto — mereka guna sheet posting log.
+  const isContentTeam = ["CC", "VID_TT", "VID_PROD"].includes(
+    positionCode ?? ""
+  );
+
   const groups: NavGroup[] = [
     {
       title: "Kerja Saya",
@@ -89,16 +99,22 @@ export default function Sidebar({
           show: canKeyInSale(role, positionCode) || manager,
         },
         {
+          href: "/dashboard/prestasi-konten",
+          label: "Prestasi Konten",
+          icon: "🎬",
+          show: isContentTeam || manager || role === "ceo",
+        },
+        {
           href: "/dashboard/isu-pelanggan",
           label: "Isu Pelanggan",
           icon: "🚨",
-          show: true,
+          show: isCS || manager || role === "ceo",
         },
         {
           href: "/dashboard/laporan-chat",
           label: "Laporan Chat",
           icon: "💬",
-          show: true,
+          show: isCS || manager || role === "ceo",
         },
         {
           href: "/dashboard/recovery",

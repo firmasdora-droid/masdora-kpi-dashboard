@@ -8,7 +8,7 @@ import DataTable, { DataTableColumn } from "@/components/DataTable";
 import type {
   Profile,
   Sale,
-  SaleLookup,
+
   SalePlatform,
 } from "@/types/database";
 
@@ -41,7 +41,7 @@ function formatRM(n: number | string | null | undefined): string {
 export default function SalesPage() {
   const supabase = createClient();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [lookups, setLookups] = useState<SaleLookup[]>([]);
+
   const [recent, setRecent] = useState<SaleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
@@ -78,13 +78,6 @@ export default function SalesPage() {
       .eq("id", user.id)
       .maybeSingle<Profile>();
     setProfile(prof ?? null);
-
-    const { data: lookupRows } = await supabase
-      .from("sale_lookups")
-      .select("*")
-      .order("type")
-      .order("name");
-    setLookups((lookupRows as SaleLookup[]) ?? []);
 
     if (prof && (isManager(prof.role) || isCeo(prof.role))) {
       const [{ data: saleRows }, { data: profiles }] = await Promise.all([
@@ -128,7 +121,6 @@ export default function SalesPage() {
 
   const eligible =
     !!profile && canKeyInSale(profile.role as Role, profile.position_code);
-  const showLiveFields = profile?.position_code === "VID_PROD";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -200,9 +192,6 @@ export default function SalesPage() {
     load();
   }
 
-  const teams = lookups.filter((l) => l.type === "team");
-  const hosts = lookups.filter((l) => l.type === "host");
-  const accounts = lookups.filter((l) => l.type === "account");
 
   const recentColumns: DataTableColumn<SaleRow>[] = [
     { key: "date", header: "Tarikh" },
@@ -318,81 +307,6 @@ export default function SalesPage() {
               ))}
             </select>
           </div>
-          {showLiveFields && (
-            <>
-              <div>
-                <label className="label">Team</label>
-                <select
-                  className="input"
-                  value={form.team}
-                  onChange={(e) => setForm({ ...form, team: e.target.value })}
-                >
-                  <option value="">- Pilih -</option>
-                  {teams.map((t) => (
-                    <option key={t.id} value={t.name}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">Host Name</label>
-                <select
-                  className="input"
-                  value={form.host_name}
-                  onChange={(e) =>
-                    setForm({ ...form, host_name: e.target.value })
-                  }
-                >
-                  <option value="">- Pilih -</option>
-                  {hosts.map((h) => (
-                    <option key={h.id} value={h.name}>
-                      {h.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">Live Account</label>
-                <select
-                  className="input"
-                  value={form.live_account}
-                  onChange={(e) =>
-                    setForm({ ...form, live_account: e.target.value })
-                  }
-                >
-                  <option value="">- Pilih -</option>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.name}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">Mula Sesi</label>
-                <input
-                  type="time"
-                  className="input"
-                  value={form.session_start}
-                  onChange={(e) =>
-                    setForm({ ...form, session_start: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="label">Tamat Sesi</label>
-                <input
-                  type="time"
-                  className="input"
-                  value={form.session_end}
-                  onChange={(e) =>
-                    setForm({ ...form, session_end: e.target.value })
-                  }
-                />
-              </div>
-            </>
-          )}
           <div className="md:col-span-3">
             <label className="label">Catatan</label>
             <input
