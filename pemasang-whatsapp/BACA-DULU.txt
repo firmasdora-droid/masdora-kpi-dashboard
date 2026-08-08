@@ -24,12 +24,12 @@ CARA PASANG
 -----------
 1. Klik dua kali fail "PASANG.bat"
 
-2. Bila Windows tanya kebenaran (popup biru/kuning), klik "Yes"
-   - Ini akan berlaku beberapa kali. Klik Yes setiap kali.
+2. Tunggu 10-20 minit. Jangan tutup tetingkap hitam itu.
+   (Ia memuat turun lebih kurang 200 MB alat pembinaan)
 
-3. Tunggu 5-15 minit. Jangan tutup tetingkap hitam itu.
+   TIADA popup kebenaran Windows. Tiada admin diperlukan.
 
-4. Di hujung, QR code akan muncul. Imbas dengan telefon:
+3. Di hujung, QR code akan muncul. Imbas dengan telefon:
    - Buka WhatsApp di telefon
    - Tekan tiga titik (menu) di penjuru atas
    - Pilih "Linked Devices" / "Peranti Berpaut"
