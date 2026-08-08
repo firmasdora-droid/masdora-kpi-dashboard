@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -14,9 +14,6 @@ import DataTable, { DataTableColumn } from "@/components/DataTable";
 import AvatarInitials from "@/components/AvatarInitials";
 import RankBarChart, { RankBarItem } from "@/components/charts/RankBarChart";
 import type {
-  Department,
-  Profile,
-  VWeekSummary,
   VSalesRankDaily,
   VSalesRankWeekly,
   VSalesRankMonthly,
@@ -51,168 +48,16 @@ function rankLabel(rank: number): React.ReactNode {
 }
 
 export default function LeaderboardPage() {
-  const [mainTab, setMainTab] = useState<"jualan" | "todo">("jualan");
-
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-white">Leaderboard</h2>
+        <h2 className="text-xl font-bold text-white">Leaderboard Jualan</h2>
         <p className="text-sm text-muted">
-          Ranking jualan &amp; penyiapan to-do seluruh pasukan.
+          Ranking jualan seluruh pasukan — harian, mingguan &amp; bulanan.
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          className={`pill ${mainTab === "jualan" ? "pill-hijau" : "pill-kosong"}`}
-          onClick={() => setMainTab("jualan")}
-        >
-          💰 Jualan
-        </button>
-        <button
-          className={`pill ${mainTab === "todo" ? "pill-hijau" : "pill-kosong"}`}
-          onClick={() => setMainTab("todo")}
-        >
-          📋 Penyiapan To-Do
-        </button>
-      </div>
-
-      {mainTab === "jualan" ? <SalesLeaderboard /> : <TodoLeaderboard />}
-    </div>
-  );
-}
-
-interface TodoRankRow {
-  user_id: string;
-  rank: number;
-  full_name: string;
-  dept_code: string | null;
-  deptColor?: string;
-  pct: number;
-  siap: number;
-  total: number;
-  tangguh: number;
-}
-
-function TodoLeaderboard() {
-  const supabase = createClient();
-  const [week, setWeek] = useState<WeekValue>({
-    year: getCurrentYear(),
-    month: getCurrentMonth(),
-    week: getCurrentWeekOfMonth(),
-  });
-  const [summaries, setSummaries] = useState<VWeekSummary[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [{ data: summaryRows }, { data: profileRows }, { data: deptRows }] =
-      await Promise.all([
-        supabase
-          .from("v_week_summary")
-          .select("*")
-          .eq("year", week.year)
-          .eq("month", week.month)
-          .eq("week", week.week),
-        supabase.from("profiles").select("*").eq("active", true),
-        supabase.from("departments").select("*").order("sort_order"),
-      ]);
-    setSummaries((summaryRows as VWeekSummary[]) ?? []);
-    setProfiles((profileRows as Profile[]) ?? []);
-    setDepartments((deptRows as Department[]) ?? []);
-    setLoading(false);
-  }, [week, supabase]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const rows = useMemo<TodoRankRow[]>(() => {
-    const profileMap = new Map<string, Profile>();
-    profiles.forEach((p) => profileMap.set(p.id, p));
-    const colorMap = new Map<string, string>();
-    departments.forEach((d) => colorMap.set(d.code, d.color));
-
-    const built: TodoRankRow[] = [];
-    summaries.forEach((s) => {
-      const profile = profileMap.get(s.user_id);
-      if (!profile) return;
-      built.push({
-        user_id: s.user_id,
-        rank: 0,
-        full_name: profile.full_name,
-        dept_code: profile.dept_code,
-        deptColor: colorMap.get(profile.dept_code ?? ""),
-        pct: s.pct ?? 0,
-        siap: s.siap,
-        total: s.total,
-        tangguh: s.tangguh,
-      });
-    });
-    built.sort((a, b) => b.pct - a.pct || a.full_name.localeCompare(b.full_name));
-    built.forEach((r, i) => {
-      r.rank = i + 1;
-    });
-    return built;
-  }, [summaries, profiles, departments]);
-
-  const columns: DataTableColumn<TodoRankRow>[] = [
-    { key: "rank", header: "#", render: (r) => rankLabel(r.rank) },
-    {
-      key: "full_name",
-      header: "Nama",
-      render: (r) => (
-        <div className="flex items-center gap-2">
-          <AvatarInitials name={r.full_name} deptColor={r.deptColor} size={26} />
-          <span>{r.full_name}</span>
-        </div>
-      ),
-    },
-    { key: "dept_code", header: "Jabatan", render: (r) => r.dept_code ?? "-" },
-    { key: "siap", header: "Siap", render: (r) => `${r.siap}/${r.total}` },
-    { key: "tangguh", header: "Tangguh" },
-    {
-      key: "pct",
-      header: "% Siap",
-      render: (r) => {
-        const { label, pill } = pctPill(r.pct);
-        return <span className={`pill pill-${pill}`}>{label}</span>;
-      },
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <motion.div {...cardMotion} className="card">
-        <WeekPicker value={week} onChange={setWeek} />
-      </motion.div>
-      {loading ? (
-        <p className="text-sm text-muted">Memuatkan...</p>
-      ) : (
-        <>
-          <RankBarChart
-            items={rows.map(
-              (r): RankBarItem => ({
-                id: r.user_id,
-                rank: r.rank,
-                name: r.full_name,
-                deptCode: r.dept_code,
-                deptColor: r.deptColor,
-                value: r.pct,
-                valueLabel: `${r.pct}%`,
-              })
-            )}
-          />
-          <DataTable<TodoRankRow>
-            columns={columns}
-            rows={rows}
-            rowKey={(r) => r.user_id}
-            emptyMessage="Tiada data to-do untuk minggu ini."
-          />
-        </>
-      )}
+      <SalesLeaderboard />
     </div>
   );
 }
@@ -258,21 +103,47 @@ function SalesDaily() {
   const [date, setDate] = useState(today);
   const [rows, setRows] = useState<VSalesRankDaily[]>([]);
   const [loading, setLoading] = useState(true);
+  const [autoPicked, setAutoPicked] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Kalau hari ini tiada jualan, terus tunjuk hari TERKINI yang ada jualan
+  // supaya pengguna tak nampak skrin kosong tanpa sebab.
+  useEffect(() => {
+    if (autoPicked) return;
+    (async () => {
+      const { data } = await supabase
+        .from("v_sales_rank_daily")
+        .select("date")
+        .order("date", { ascending: false })
+        .limit(1);
+      const latest = (data as { date: string }[] | null)?.[0]?.date;
+      if (latest && latest !== today) setDate(latest);
+      setAutoPicked(true);
+    })();
+  }, [autoPicked, supabase, today]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    setError(null);
+    const { data, error: qErr } = await supabase
       .from("v_sales_rank_daily")
       .select("*")
       .eq("date", date)
       .order("rank");
-    setRows((data as VSalesRankDaily[]) ?? []);
+    if (qErr) {
+      setError(
+        "Leaderboard jualan belum disediakan dalam database. Sila run fail add-sales-leaderboard-views.sql di Supabase."
+      );
+      setRows([]);
+    } else {
+      setRows((data as VSalesRankDaily[]) ?? []);
+    }
     setLoading(false);
   }, [date, supabase]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (autoPicked) load();
+  }, [load, autoPicked]);
 
   const columns: DataTableColumn<VSalesRankDaily>[] = [
     { key: "rank", header: "#", render: (r) => rankLabel(r.rank) },
@@ -305,7 +176,28 @@ function SalesDaily() {
           value={date}
           onChange={(e) => setDate(e.target.value)}
         />
+        {date !== today && (
+          <p className="mt-2 text-xs text-slate-400">
+            Menunjukkan hari terkini yang ada jualan.{" "}
+            <button
+              onClick={() => setDate(today)}
+              className="font-semibold text-brand-400 underline"
+            >
+              Tukar ke hari ini
+            </button>
+          </p>
+        )}
       </motion.div>
+
+      {error && (
+        <motion.div
+          {...cardMotion}
+          className="card border-red-500/30 text-sm text-red-300"
+        >
+          {error}
+        </motion.div>
+      )}
+
       {loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : (
