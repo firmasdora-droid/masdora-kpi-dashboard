@@ -20,6 +20,43 @@ export interface CsIssue {
   description: string;
   solution: string;
   handler: string;
+  /** Status yang dinormalkan untuk paparan/tapisan. */
+  status: "baru" | "proses" | "selesai" | "perhatian";
+  /** Teks asal dalam lajur STATUS sheet (kosong jika tiada). */
+  statusRaw: string;
+}
+
+/**
+ * Padankan apa sahaja yang CS taip dalam lajur STATUS kepada 4 status rasmi.
+ * Sengaja longgar supaya ejaan/bahasa berbeza tetap dikenali.
+ */
+function normalizeStatus(
+  raw: string,
+  hasSolution: boolean
+): CsIssue["status"] {
+  const s = raw.trim().toLowerCase();
+
+  if (!s) {
+    // Tiada status ditulis — teka dari ada/tiada penyelesaian
+    return hasSolution ? "selesai" : "baru";
+  }
+
+  if (/(selesai|settle|done|resolve|closed|close|ok|siap)/.test(s)) {
+    return "selesai";
+  }
+  if (/(proses|process|progress|pending|ongoing|tengah|handle|follow)/.test(s)) {
+    return "proses";
+  }
+  if (/(perhatian|urgent|escalat|eskalasi|bermasalah|isu|penting|attention)/.test(s)) {
+    return "perhatian";
+  }
+  if (/(baru|new|open)/.test(s)) {
+    return "baru";
+  }
+
+  // Perkataan lain yang tak dikenali — anggap sedang diuruskan supaya
+  // ia tetap kelihatan sebagai kerja yang belum tutup.
+  return "proses";
 }
 
 /** Parse CSV mengikut RFC4180 — kendalikan petikan, koma & newline dalam sel. */
@@ -105,11 +142,23 @@ function extractIsoDate(free: string): string | null {
   return `${year}-${pad(month)}-${pad(day)}`;
 }
 
+/**
+ * Pilihan cache: biasanya cache 60 saat supaya tak membebankan Google,
+ * tetapi bila pengguna tekan "Muat Semula" kita ambil data terus.
+ */
+function cacheOpts(fresh: boolean): RequestInit {
+  return fresh
+    ? { cache: "no-store" }
+    : { next: { revalidate: REVALIDATE_SECONDS } };
+}
+
 /** Kesan semua tab (nama + gid) daripada paparan HTML awam sheet. */
-async function discoverTabs(): Promise<{ name: string; gid: string }[]> {
+async function discoverTabs(
+  fresh: boolean
+): Promise<{ name: string; gid: string }[]> {
   const res = await fetch(
     `https://docs.google.com/spreadsheets/d/${SHEET_ID}/htmlview`,
-    { next: { revalidate: REVALIDATE_SECONDS } }
+    cacheOpts(fresh)
   );
   if (!res.ok) return [];
   const html = await res.text();
@@ -123,9 +172,12 @@ async function discoverTabs(): Promise<{ name: string; gid: string }[]> {
   return tabs;
 }
 
-async function fetchTab(tab: { name: string; gid: string }): Promise<CsIssue[]> {
+async function fetchTab(
+  tab: { name: string; gid: string },
+  fresh: boolean
+): Promise<CsIssue[]> {
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${tab.gid}`;
-  const res = await fetch(url, { next: { revalidate: REVALIDATE_SECONDS } });
+  const res = await fetch(url, cacheOpts(fresh));
   if (!res.ok) return [];
 
   const rows = parseCsv(await res.text());
@@ -138,6 +190,7 @@ async function fetchTab(tab: { name: string; gid: string }): Promise<CsIssue[]> 
   const cDesc = findCol(headers, ["MASALAH", "ISSUE", "PROBLEM"]);
   const cSolution = findCol(headers, ["SOLUTION", "PENYELESAIAN"]);
   const cHandler = findCol(headers, ["HANDLER", "PENGENDALI"]);
+  const cStatus = findCol(headers, ["STATUS"]);
 
   const out: CsIssue[] = [];
   let lastRawDate = "";
@@ -161,6 +214,7 @@ async function fetchTab(tab: { name: string; gid: string }): Promise<CsIssue[]> 
     const description = get(cDesc);
     const solution = get(cSolution);
     const handler = normalizeHandler(get(cHandler));
+    const statusRaw = get(cStatus);
 
     // Langkau baris yang benar-benar kosong
     if (!username && !platform && !description && !handler) continue;
@@ -175,15 +229,20 @@ async function fetchTab(tab: { name: string; gid: string }): Promise<CsIssue[]> 
       description,
       solution,
       handler,
+      status: normalizeStatus(statusRaw, solution.trim().length > 0),
+      statusRaw,
     });
   }
 
   return out;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const tabs = await discoverTabs();
+    const fresh =
+      new URL(request.url).searchParams.get("fresh") === "1";
+
+    const tabs = await discoverTabs(fresh);
     if (tabs.length === 0) {
       return Response.json(
         { ok: false, error: "Tiada tab dijumpai dalam sheet." },
@@ -192,7 +251,7 @@ export async function GET() {
     }
 
     const results = await Promise.all(
-      tabs.map((t) => fetchTab(t).catch(() => [] as CsIssue[]))
+      tabs.map((t) => fetchTab(t, fresh).catch(() => [] as CsIssue[]))
     );
     const issues = results.flat();
 

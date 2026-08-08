@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
+
+type StatusKey = "baru" | "proses" | "selesai" | "perhatian";
 
 interface CsIssue {
   monthTab: string;
@@ -14,6 +15,8 @@ interface CsIssue {
   description: string;
   solution: string;
   handler: string;
+  status: StatusKey;
+  statusRaw: string;
 }
 
 const SHEET_URL =
@@ -25,8 +28,6 @@ const HANDLER_NAMES: Record<string, string> = {
   TI: "Najjati",
   HAWA: "Natasya",
 };
-
-type StatusKey = "baru" | "proses" | "selesai" | "perhatian";
 
 const STATUSES: {
   key: StatusKey;
@@ -49,30 +50,17 @@ const cardMotion = {
 };
 
 const STAT_ACCENTS = [
-  "from-masdora-orange/20 to-masdora-orange/5 border-masdora-orange/25",
+  "from-masdora-gray/15 to-masdora-gray/5 border-masdora-gray/25",
   "from-masdora-yellow/18 to-masdora-yellow/5 border-masdora-yellow/25",
   "from-masdora-olive/25 to-masdora-olive/5 border-masdora-olive/35",
   "from-masdora-alert/20 to-masdora-alert/5 border-masdora-alert/25",
 ];
 
-/** Kunci stabil untuk padankan isu dari sheet dengan status dalam database. */
-function keyOf(i: CsIssue) {
-  return `${i.monthTab}-${i.rowIndex}`;
-}
-
-/** Status awal kalau team belum tanda apa-apa lagi. */
-function defaultStatus(i: CsIssue): StatusKey {
-  return i.solution.trim() ? "selesai" : "baru";
-}
-
 export default function IsuPelangganPage() {
-  const supabase = createClient();
-
   const [issues, setIssues] = useState<CsIssue[]>([]);
   const [tabs, setTabs] = useState<string[]>([]);
-  const [statuses, setStatuses] = useState<Record<string, StatusKey>>({});
-  const [savingKey, setSavingKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [monthFilter, setMonthFilter] = useState("");
@@ -80,73 +68,36 @@ export default function IsuPelangganPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (fresh = false) => {
     setLoading(true);
     setError(null);
     try {
-      const [sheetRes, { data: statusRows }] = await Promise.all([
-        fetch("/api/cs-issues", { cache: "no-store" }).then((r) => r.json()),
-        supabase.from("cs_issue_status").select("source_key, status"),
-      ]);
-
-      if (!sheetRes.ok) {
-        setError(sheetRes.error ?? "Gagal memuatkan data.");
+      const res = await fetch(`/api/cs-issues${fresh ? "?fresh=1" : ""}`, {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        setError(json.error ?? "Gagal memuatkan data.");
         setIssues([]);
       } else {
-        setIssues(sheetRes.issues as CsIssue[]);
-        setTabs((sheetRes.tabs as string[]) ?? []);
+        setIssues(json.issues as CsIssue[]);
+        setTabs((json.tabs as string[]) ?? []);
+        setRefreshedAt(
+          new Date().toLocaleTimeString("ms-MY", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        );
       }
-
-      const map: Record<string, StatusKey> = {};
-      ((statusRows as { source_key: string; status: string }[]) ?? []).forEach(
-        (r) => {
-          map[r.source_key] = r.status as StatusKey;
-        }
-      );
-      setStatuses(map);
     } catch {
       setError("Gagal menghubungi Google Sheet.");
     }
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
-
-  function statusOf(i: CsIssue): StatusKey {
-    return statuses[keyOf(i)] ?? defaultStatus(i);
-  }
-
-  async function setStatus(issue: CsIssue, next: StatusKey) {
-    const key = keyOf(issue);
-    setSavingKey(key);
-    // Kemas skrin dahulu supaya terasa pantas
-    setStatuses((prev) => ({ ...prev, [key]: next }));
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    const { error: upsertError } = await supabase
-      .from("cs_issue_status")
-      .upsert(
-        {
-          source_key: key,
-          status: next,
-          updated_by: user?.id ?? null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "source_key" }
-      );
-
-    setSavingKey(null);
-
-    if (upsertError) {
-      setError("Gagal menyimpan status: " + upsertError.message);
-      load();
-    }
-  }
 
   const handlers = useMemo(
     () => Array.from(new Set(issues.map((i) => i.handler).filter(Boolean))).sort(),
@@ -158,7 +109,7 @@ export default function IsuPelangganPage() {
     return issues.filter((i) => {
       if (monthFilter && i.monthTab !== monthFilter) return false;
       if (handlerFilter && i.handler !== handlerFilter) return false;
-      if (statusFilter && statusOf(i) !== statusFilter) return false;
+      if (statusFilter && i.status !== statusFilter) return false;
       if (q) {
         const hay =
           `${i.username} ${i.description} ${i.solution} ${i.platform} ${i.handler}`.toLowerCase();
@@ -166,8 +117,7 @@ export default function IsuPelangganPage() {
       }
       return true;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [issues, monthFilter, handlerFilter, statusFilter, search, statuses]);
+  }, [issues, monthFilter, handlerFilter, statusFilter, search]);
 
   const counts = useMemo(() => {
     const c: Record<StatusKey, number> = {
@@ -176,12 +126,9 @@ export default function IsuPelangganPage() {
       selesai: 0,
       perhatian: 0,
     };
-    filtered.forEach((i) => {
-      c[statusOf(i)]++;
-    });
+    filtered.forEach((i) => c[i.status]++);
     return c;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, statuses]);
+  }, [filtered]);
 
   return (
     <div className="space-y-6">
@@ -189,11 +136,21 @@ export default function IsuPelangganPage() {
         <div>
           <h2 className="text-xl font-bold text-white">Isu Pelanggan</h2>
           <p className="text-sm text-muted">
-            Isu dari Google Sheet · status boleh ditanda terus di sini.
+            Terus dari Google Sheet — termasuk status. Kemas kini di sheet,
+            dashboard ikut sendiri.
+            {refreshedAt && (
+              <span className="ml-1 text-slate-500">
+                (dikemas kini {refreshedAt})
+              </span>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={load} className="btn-secondary" disabled={loading}>
+          <button
+            onClick={() => load(true)}
+            className="btn-secondary"
+            disabled={loading}
+          >
             {loading ? "Memuatkan..." : "Muat Semula"}
           </button>
           <a
@@ -300,12 +257,10 @@ export default function IsuPelangganPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((issue, i) => {
-            const key = keyOf(issue);
-            const current = statusOf(issue);
-            const meta = STATUS_MAP[current];
+            const meta = STATUS_MAP[issue.status];
             return (
               <motion.div
-                key={key}
+                key={`${issue.monthTab}-${issue.rowIndex}`}
                 {...cardMotion}
                 transition={{
                   ...cardMotion.transition,
@@ -322,8 +277,15 @@ export default function IsuPelangganPage() {
                     {issue.reportedAt || issue.rawDate || "Tiada tarikh"} ·{" "}
                     {issue.monthTab}
                   </span>
-                  <span className={`pill ml-auto ${meta.pill}`}>
-                    {meta.icon} {meta.label}
+                  <span
+                    className={`pill ml-auto ${meta.pill}`}
+                    title={
+                      issue.statusRaw
+                        ? `Status dari sheet: "${issue.statusRaw}"`
+                        : "Tiada status di sheet — dikira dari ruangan Solution"
+                    }
+                  >
+                    {meta.icon} {issue.statusRaw || meta.label}
                   </span>
                 </div>
 
@@ -345,30 +307,6 @@ export default function IsuPelangganPage() {
                     </p>
                   </div>
                 )}
-
-                {/* Tukar status */}
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    Tukar status:
-                  </span>
-                  {STATUSES.map((s) => (
-                    <button
-                      key={s.key}
-                      onClick={() => setStatus(issue, s.key)}
-                      disabled={savingKey === key}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                        current === s.key
-                          ? "bg-white/15 text-white"
-                          : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-                      } disabled:opacity-50`}
-                    >
-                      {s.icon} {s.label}
-                    </button>
-                  ))}
-                  {savingKey === key && (
-                    <span className="text-xs text-slate-500">Menyimpan...</span>
-                  )}
-                </div>
               </motion.div>
             );
           })}
