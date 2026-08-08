@@ -28,6 +28,17 @@ export interface ContentPost {
   handler: string;
 }
 
+/**
+ * Nama handler yang telah bertukar orang. "Nisa" digantikan oleh "Qistina",
+ * jadi rekod lama digabungkan supaya sejarah kekal dalam satu nama.
+ */
+const HANDLER_ALIASES: Record<string, string> = { nisa: "Qistina" };
+
+function normalizeHandler(raw: string): string {
+  const t = raw.trim();
+  return HANDLER_ALIASES[t.toLowerCase()] ?? t;
+}
+
 function cacheOpts(fresh: boolean): RequestInit {
   return fresh
     ? { cache: "no-store" }
@@ -144,7 +155,7 @@ async function fetchTab(
     const get = (idx: number) => (r[idx] ?? "").trim();
 
     const account = get(C_ACCOUNT);
-    const handler = get(C_HANDLER);
+    const handler = normalizeHandler(get(C_HANDLER));
     if (!account || !handler) continue;
 
     const postedAt = get(C_POSTED);
