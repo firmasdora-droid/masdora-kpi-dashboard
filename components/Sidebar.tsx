@@ -142,7 +142,7 @@ export default function Sidebar({
       items: [
         {
           href: "/dashboard/campaigns",
-          label: "Kempen Bulanan",
+          label: "Kempen & Pelancaran",
           icon: "🎉",
           show: true,
         },
