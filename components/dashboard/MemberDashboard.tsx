@@ -11,6 +11,7 @@ import {
   monthName,
 } from "@/lib/period";
 import AvatarInitials from "@/components/AvatarInitials";
+import SalesPodium, { PodiumItem } from "@/components/charts/SalesPodium";
 import type {
   Campaign,
   Todo,
@@ -240,46 +241,21 @@ export default function MemberDashboard({
               Lihat semua →
             </Link>
           </div>
-          {salesRank.length === 0 ? (
-            <p className="text-sm text-muted">
-              Belum ada rekod jualan untuk bulan ini.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {salesRank.map((r, i) => {
-                const isMe = r.user_id === userId;
-                return (
-                  <motion.div
-                    key={r.user_id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: i * 0.05 }}
-                    className={`flex items-center gap-3 rounded-xl border p-3 ${
-                      isMe
-                        ? "border-masdora-orange/40 bg-masdora-orange/10"
-                        : "border-white/10 bg-white/[0.03]"
-                    }`}
-                  >
-                    <span className="w-6 text-center text-sm">
-                      {MEDALS[i] ?? `#${r.rank}`}
-                    </span>
-                    <AvatarInitials name={r.full_name} size={30} />
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-100">
-                      {r.full_name}
-                      {isMe && (
-                        <span className="ml-1.5 text-[10px] font-bold text-masdora-orange">
-                          ANDA
-                        </span>
-                      )}
-                    </span>
-                    <span className="flex-shrink-0 text-sm font-black text-white">
-                      {formatRM(r.total_rm)}
-                    </span>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
+          <SalesPodium
+            bare
+            highlightId={userId}
+            items={salesRank.map(
+              (r): PodiumItem => ({
+                id: r.user_id,
+                rank: r.rank,
+                name: r.full_name,
+                deptCode: r.dept_code,
+                value: Number(r.total_rm ?? 0),
+                valueLabel: formatRM(r.total_rm),
+              })
+            )}
+            emptyMessage="Belum ada rekod jualan untuk bulan ini."
+          />
         </motion.div>
       </div>
 

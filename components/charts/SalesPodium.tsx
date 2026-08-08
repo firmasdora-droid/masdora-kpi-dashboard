@@ -45,12 +45,20 @@ const STYLES: Record<
 export default function SalesPodium({
   items,
   emptyMessage = "Tiada data untuk tempoh ini.",
+  bare = false,
+  highlightId,
 }: {
   items: PodiumItem[];
   emptyMessage?: string;
+  /** Jangan bungkus dalam kad — guna bila sudah berada dalam kad lain. */
+  bare?: boolean;
+  /** Tonjolkan orang ini sebagai "ANDA". */
+  highlightId?: string;
 }) {
   if (items.length === 0) {
-    return (
+    return bare ? (
+      <p className="text-sm text-muted">{emptyMessage}</p>
+    ) : (
       <motion.div
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
@@ -70,7 +78,7 @@ export default function SalesPodium({
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
-      className="card"
+      className={bare ? "" : "card"}
     >
       {/* Pentas */}
       <div className="flex items-end justify-center gap-3 pt-4 sm:gap-6">
@@ -97,6 +105,11 @@ export default function SalesPodium({
 
               <p className="w-full truncate text-center text-sm font-bold text-white">
                 {item.name}
+                {highlightId === item.id && (
+                  <span className="ml-1 text-[9px] font-black text-masdora-orange">
+                    ANDA
+                  </span>
+                )}
               </p>
               {item.deptCode && (
                 <p className="truncate text-[10px] uppercase tracking-wide text-slate-500">
@@ -144,6 +157,11 @@ export default function SalesPodium({
               <AvatarInitials name={item.name} size={28} />
               <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-200">
                 {item.name}
+                {highlightId === item.id && (
+                  <span className="ml-1.5 text-[9px] font-black text-masdora-orange">
+                    ANDA
+                  </span>
+                )}
               </span>
               {item.deptCode && (
                 <span className="hidden text-[10px] uppercase tracking-wide text-slate-500 sm:inline">
