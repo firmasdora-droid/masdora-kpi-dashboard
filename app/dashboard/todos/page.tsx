@@ -293,6 +293,15 @@ export default function TodosPage() {
         </div>
       ) : (
         <div className="card space-y-3">
+          {/* Label lajur supaya jelas ruangan mana untuk apa */}
+          <div className="hidden gap-3 border-b border-white/10 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 md:grid md:grid-cols-12">
+            <span className="md:col-span-3">Tugasan</span>
+            <span className="md:col-span-2">Keutamaan</span>
+            <span className="md:col-span-2">Status</span>
+            <span className="md:col-span-2">% Siap</span>
+            <span className="md:col-span-2">Catatan</span>
+            <span className="md:col-span-1" />
+          </div>
           {todos.map((todo, i) => (
             <TodoItem
               key={todo.id}
@@ -320,6 +329,13 @@ function TodoItem({
   onDelete: (todo: Todo) => void;
 }) {
   const [note, setNote] = useState(todo.note ?? "");
+  // Simpan nilai sementara semasa menaip supaya kursor tidak hilang.
+  // Hanya disimpan ke database bila keluar dari ruangan (blur) atau tekan Enter.
+  const [pctInput, setPctInput] = useState(String(todo.pct));
+
+  useEffect(() => {
+    setPctInput(String(todo.pct));
+  }, [todo.pct]);
 
   return (
     <motion.div
@@ -365,14 +381,30 @@ function TodoItem({
         </select>
       </div>
       <div className="md:col-span-2">
-        <input
-          type="number"
-          min={0}
-          max={100}
-          className="input"
-          value={todo.pct}
-          onChange={(e) => onUpdate(todo, { pct: Number(e.target.value) })}
-        />
+        <div className="relative">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={5}
+            className="input pr-8"
+            placeholder="0"
+            value={pctInput}
+            onChange={(e) => setPctInput(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            onBlur={() => {
+              const n = Math.max(0, Math.min(100, Number(pctInput) || 0));
+              setPctInput(String(n));
+              if (n !== todo.pct) onUpdate(todo, { pct: n });
+            }}
+          />
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">
+            %
+          </span>
+        </div>
       </div>
       <div className="md:col-span-2">
         <input
