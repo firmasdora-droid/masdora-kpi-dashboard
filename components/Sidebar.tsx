@@ -95,8 +95,14 @@ export default function Sidebar({
           show: true,
         },
         {
-          href: "https://masdora.zo.space/team/recovery-crm",
+          href: "/dashboard/recovery",
           label: "Recovery CRM",
+          icon: "🔄",
+          show: isMaisarah || manager || role === "ceo",
+        },
+        {
+          href: "https://masdora.zo.space/team/recovery-crm",
+          label: "Buka Sistem CRM",
           icon: "🔗",
           show: isMaisarah,
           external: true,
