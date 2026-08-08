@@ -9,7 +9,9 @@ import {
   getCurrentWeekOfMonth,
 } from "@/lib/period";
 import WeekPicker, { WeekValue } from "@/components/WeekPicker";
+import TeamTodoReport from "@/components/dashboard/TeamTodoReport";
 import type {
+  Profile,
   Todo,
   TodoPriority,
   TodoStatus,
@@ -57,6 +59,8 @@ function isBeforeDeadline(): boolean {
 
 export default function TodosPage() {
   const supabase = createClient();
+  const [role, setRole] = useState<string | null>(null);
+  const [roleLoaded, setRoleLoaded] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [week, setWeek] = useState<WeekValue>({
     year: getCurrentYear(),
@@ -75,6 +79,15 @@ export default function TodosPage() {
         data: { user },
       } = await supabase.auth.getUser();
       setUserId(user?.id ?? null);
+      if (user) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle<Pick<Profile, "role">>();
+        setRole(prof?.role ?? null);
+      }
+      setRoleLoaded(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -187,12 +200,24 @@ export default function TodosPage() {
     load();
   }
 
+  // Marketing Manager & CEO tidak perlu isi to-do sendiri —
+  // mereka melihat laporan team secara langsung.
+  if (!roleLoaded) {
+    return <p className="text-sm text-muted">Memuatkan...</p>;
+  }
+  if (role === "manager" || role === "ceo") {
+    return <TeamTodoReport />;
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-white">To-Do Mingguan</h2>
+        <h2 className="text-xl font-bold text-white">
+          Weekly To-Do List Team
+        </h2>
         <p className="text-sm text-muted">
-          Susun & kemas kini tugasan anda untuk minggu ini.
+          Kemas kini tugasan anda. Wajib dihantar setiap{" "}
+          <strong className="text-amber-300">Jumaat sebelum 5:00 petang</strong>.
         </p>
       </div>
 

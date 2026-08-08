@@ -426,10 +426,17 @@ export default function DashboardUtama() {
           </div>
 
           <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="font-semibold text-white">To-Do Mingguan</h3>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="font-semibold text-white">
+                  Weekly To-Do List Team
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Tarikh akhir: Jumaat sebelum 5:00 petang
+                </p>
+              </div>
               <Link href="/dashboard/todos" className="text-xs font-medium text-brand-400 hover:underline">
-                Halaman To-Do →
+                Lihat laporan penuh →
               </Link>
             </div>
             <motion.div {...cardMotion} className="card overflow-x-auto">

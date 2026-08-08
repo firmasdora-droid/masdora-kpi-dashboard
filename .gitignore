@@ -35,3 +35,4 @@ next-env.d.ts
 
 # tools (portable node, if used)
 .tools/
+qr-whatsapp.png
