@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import DashboardUtama from "@/components/dashboard/DashboardUtama";
+import MemberDashboard from "@/components/dashboard/MemberDashboard";
 import type { Profile } from "@/types/database";
 
 export default async function OverviewPage() {
@@ -19,8 +20,10 @@ export default async function OverviewPage() {
 
   if (!profile) redirect("/login");
 
+  // Manager/CEO nampak pantauan seluruh pasukan.
+  // Ahli biasa nampak ringkasan kerja mereka sendiri + leaderboard.
   if (profile.role !== "manager" && profile.role !== "ceo") {
-    redirect("/dashboard/todos");
+    return <MemberDashboard userId={profile.id} fullName={profile.full_name} />;
   }
 
   return <DashboardUtama />;

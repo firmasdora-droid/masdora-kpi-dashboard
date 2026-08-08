@@ -59,6 +59,12 @@ export default function Sidebar({
       title: "Kerja Saya",
       items: [
         {
+          href: "/dashboard",
+          label: "Dashboard Utama",
+          icon: "📊",
+          show: true,
+        },
+        {
           href: "/dashboard/todos",
           label: "To-Do Mingguan",
           icon: "📋",
@@ -106,17 +112,6 @@ export default function Sidebar({
           icon: "🔗",
           show: isMaisarah,
           external: true,
-        },
-      ],
-    },
-    {
-      title: "Pantau",
-      items: [
-        {
-          href: "/dashboard",
-          label: "Dashboard Utama",
-          icon: "📊",
-          show: manager || role === "ceo",
         },
       ],
     },
