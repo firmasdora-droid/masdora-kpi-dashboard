@@ -1,28 +1,27 @@
 # =============================================================================
-# PEMASANG BRIDGE WHATSAPP — Masdora Team Dashboard
+# PEMASANG BRIDGE WHATSAPP - Masdora Team Dashboard
 #
 # Memasang "jambatan" WhatsApp pada komputer ini supaya mesej dari group
 # WhatsApp team dihantar terus ke dashboard.
 #
 # Tidak memerlukan kebenaran admin. Tidak menggunakan winget.
-# Semua alat dimuat turun sebagai fail zik mudah alih ke C:\Dev\masdora-tools.
+# Semua alat dimuat turun ke C:\Dev\masdora-tools
 #
-# JANGAN jalankan fail ini terus — klik dua kali "PASANG.bat".
+# JANGAN jalankan fail ini terus - klik dua kali "PASANG.bat".
 # =============================================================================
 
 $ErrorActionPreference = "Stop"
-$ProgressPreference    = "SilentlyContinue"   # muat turun jauh lebih laju
+$ProgressPreference    = "SilentlyContinue"
 
 $TOOLS   = "C:\Dev\masdora-tools"
 $REPO    = "C:\Dev\whatsapp-mcp-go"
 $WEBHOOK = "https://masdora-kpi-dashboard.vercel.app/api/ingest/whatsapp?secret=96ec6d03610a4915739f9e450670ffa5544274846c150d06"
-
 $GCC_ZIP = "https://github.com/brechtsanders/winlibs_mingw/releases/download/16.1.0posix-14.0.0-ucrt-r4/winlibs-x86_64-posix-seh-gcc-16.1.0-mingw-w64ucrt-14.0.0-r4.zip"
 
-function Say($m)  { Write-Host "`n>> $m" -ForegroundColor Cyan }
+function Say($m)  { Write-Host "" ; Write-Host ">> $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "   OK - $m" -ForegroundColor Green }
 function Info($m) { Write-Host "   $m" -ForegroundColor Gray }
-function Die($m)  {
+function Die($m) {
     Write-Host ""
     Write-Host "GAGAL: $m" -ForegroundColor Red
     Write-Host ""
@@ -92,7 +91,6 @@ if (Test-Path $gccExe) {
     Ok "Pengkompil C sedia"
 }
 
-# Guna alat tempatan sahaja untuk sesi ini
 $env:PATH        = "$TOOLS\go\bin;$TOOLS\mingw64\bin;$env:PATH"
 $env:GOROOT      = "$TOOLS\go"
 $env:CGO_ENABLED = "1"
@@ -100,7 +98,7 @@ $env:CGO_ENABLED = "1"
 # ----------------------------------------------------------------- 3. Git
 Say "Langkah 3/6: Memeriksa Git..."
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-    Die "Git tiada pada komputer ini. Sila pasang Git dari https://git-scm.com/download/win kemudian jalankan semula PASANG.bat"
+    Die "Git tiada pada komputer ini. Pasang dari https://git-scm.com/download/win kemudian jalankan semula PASANG.bat"
 }
 Ok "Git sedia"
 
@@ -130,21 +128,20 @@ if (Test-Path $envFile) {
     $jwtSecret = -join ((1..64) | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) })
 }
 
-@"
-WHATSAPP_API_KEY=$apiKey
-WHATSAPP_JWT_SECRET=$jwtSecret
-IS_POSTGRES=false
-PORT=8080
-LOG_LEVEL=info
-BRIDGE_TZ=Asia/Kuala_Lumpur
-WEBHOOK_URL=$WEBHOOK
-"@ | Out-File $envFile -Encoding UTF8
+$envText = "WHATSAPP_API_KEY=$apiKey`r`n" +
+           "WHATSAPP_JWT_SECRET=$jwtSecret`r`n" +
+           "IS_POSTGRES=false`r`n" +
+           "PORT=8080`r`n" +
+           "LOG_LEVEL=info`r`n" +
+           "BRIDGE_TZ=Asia/Kuala_Lumpur`r`n" +
+           "WEBHOOK_URL=$WEBHOOK`r`n"
+Set-Content -Path $envFile -Value $envText -Encoding ASCII
 
 Push-Location "$REPO\whatsapp-bridge"
-Info "Mengumpul kebergantungan..."
+Info "Mengumpul kebergantungan (1-3 minit)..."
 & go mod tidy 2>&1 | Out-Null
 Info "Membina..."
-& go build -o whatsapp-bridge.exe . 2>&1 | Tee-Object -Variable buildOut | Out-Null
+$buildOut = & go build -o whatsapp-bridge.exe . 2>&1
 Pop-Location
 
 if (-not (Test-Path "$REPO\whatsapp-bridge\whatsapp-bridge.exe")) {
@@ -158,27 +155,22 @@ Ok "Bridge siap dibina"
 # ------------------------------------------------------- 6. Auto-mula + jalan
 Say "Langkah 6/6: Menyediakan auto-mula..."
 
-# Skrip pemula (tanpa admin — guna folder Startup pengguna)
 $runBat = "$REPO\jalankan-bridge.bat"
-@"
-@echo off
-cd /d "$REPO\whatsapp-bridge"
-set "PATH=$TOOLS\mingw64\bin;%PATH%"
-whatsapp-bridge.exe >> "$REPO\whatsapp-bridge\bridge.log" 2>&1
-"@ | Out-File $runBat -Encoding ASCII
+$batText = "@echo off`r`n" +
+           "cd /d `"$REPO\whatsapp-bridge`"`r`n" +
+           "set `"PATH=$TOOLS\mingw64\bin;%PATH%`"`r`n" +
+           "whatsapp-bridge.exe >> `"$REPO\whatsapp-bridge\bridge.log`" 2>&1`r`n"
+Set-Content -Path $runBat -Value $batText -Encoding ASCII
 
-# Pembungkus VBS supaya ia berjalan senyap di latar belakang
 $runVbs = "$REPO\jalankan-bridge-senyap.vbs"
-@"
-Set s = CreateObject("WScript.Shell")
-s.Run """$runBat""", 0, False
-"@ | Out-File $runVbs -Encoding ASCII
+$vbsText = "Set s = CreateObject(`"WScript.Shell`")`r`n" +
+           "s.Run `"`"`"$runBat`"`"`", 0, False`r`n"
+Set-Content -Path $runVbs -Value $vbsText -Encoding ASCII
 
 $startup = [Environment]::GetFolderPath('Startup')
-Copy-Item $runVbs "$startup\Masdora-WhatsApp-Bridge.vbs" -Force
+Copy-Item $runVbs (Join-Path $startup "Masdora-WhatsApp-Bridge.vbs") -Force
 Ok "Bridge akan hidup automatik setiap kali komputer dibuka"
 
-# Hentikan sebarang bridge lama, kemudian mula yang baru
 Get-Process whatsapp-bridge -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1
 Remove-Item "$REPO\whatsapp-bridge\bridge.log" -ErrorAction SilentlyContinue
@@ -203,9 +195,12 @@ Write-Host ""
 $log = "$REPO\whatsapp-bridge\bridge.log"
 $waited = 0
 while ($waited -lt 60) {
-    if ((Test-Path $log) -and (Select-String -Path $log -Pattern "█|▄|▀" -Quiet -ErrorAction SilentlyContinue)) { break }
+    if (Test-Path $log) {
+        $size = (Get-Item $log).Length
+        if ($size -gt 500) { break }
+    }
     Start-Sleep -Seconds 3
-    $waited += 3
+    $waited = $waited + 3
 }
 
 if (Test-Path $log) { Get-Content $log -Tail 80 }
