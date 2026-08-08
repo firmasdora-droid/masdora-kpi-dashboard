@@ -12,7 +12,7 @@ import {
 import WeekPicker, { WeekValue } from "@/components/WeekPicker";
 import DataTable, { DataTableColumn } from "@/components/DataTable";
 import AvatarInitials from "@/components/AvatarInitials";
-import RankBarChart, { RankBarItem } from "@/components/charts/RankBarChart";
+import SalesPodium, { PodiumItem } from "@/components/charts/SalesPodium";
 import type {
   VSalesRankDaily,
   VSalesRankWeekly,
@@ -202,9 +202,9 @@ function SalesDaily() {
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : (
         <>
-          <RankBarChart
+          <SalesPodium
             items={rows.map(
-              (r): RankBarItem => ({
+              (r): PodiumItem => ({
                 id: r.user_id,
                 rank: r.rank,
                 name: r.full_name,
@@ -283,9 +283,9 @@ function SalesWeekly() {
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : (
         <>
-          <RankBarChart
+          <SalesPodium
             items={rows.map(
-              (r): RankBarItem => ({
+              (r): PodiumItem => ({
                 id: r.user_id,
                 rank: r.rank,
                 name: r.full_name,
@@ -402,9 +402,9 @@ function SalesMonthly() {
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : (
         <>
-          <RankBarChart
+          <SalesPodium
             items={rows.map(
-              (r): RankBarItem => ({
+              (r): PodiumItem => ({
                 id: r.user_id,
                 rank: r.rank,
                 name: r.full_name,

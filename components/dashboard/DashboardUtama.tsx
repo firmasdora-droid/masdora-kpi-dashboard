@@ -11,6 +11,7 @@ import {
   monthName,
 } from "@/lib/period";
 import AvatarInitials from "@/components/AvatarInitials";
+import SalesPodium, { PodiumItem } from "@/components/charts/SalesPodium";
 import type {
   Campaign,
   Department,
@@ -384,45 +385,19 @@ export default function DashboardUtama() {
             <p className="mb-2 text-xs text-slate-500">
               Tiga teratas penyiapan to-do bagi Minggu {week}.
             </p>
-            {todoLeaders.length === 0 ? (
-              <motion.div {...cardMotion} className="card text-sm text-muted">
-                Tiada data leaderboard untuk tempoh ini.
-              </motion.div>
-            ) : (
-              <div className="card divide-y divide-white/5">
-                {todoLeaders.map(({ summary, profile }, i) => (
-                  <motion.div
-                    key={summary.user_id}
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.45,
-                      delay: i * 0.06,
-                      ease: [0.4, 0, 0.2, 1],
-                    }}
-                    className="flex items-center gap-3 rounded-lg px-2 py-2 transition first:pt-2 last:pb-2 hover:bg-white/5"
-                  >
-                    <span className="w-6 text-lg">{MEDALS[i] ?? `#${i + 1}`}</span>
-                    <AvatarInitials
-                      name={profile!.full_name}
-                      deptColor={deptColor.get(profile!.dept_code ?? "")}
-                      size={32}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-white">
-                        {profile!.full_name}
-                      </p>
-                      <p className="truncate text-xs text-muted">
-                        {profile!.position_code ?? "-"}
-                      </p>
-                    </div>
-                    <span className="text-sm font-bold text-brand-400">
-                      {summary.pct ?? 0}%
-                    </span>
-                  </motion.div>
-                ))}
-              </div>
-            )}
+            <SalesPodium
+              items={todoLeaders.map(
+                ({ summary, profile }, i): PodiumItem => ({
+                  id: summary.user_id,
+                  rank: i + 1,
+                  name: profile!.full_name,
+                  deptCode: profile!.position_code,
+                  value: Number(summary.pct ?? 0),
+                  valueLabel: `${summary.pct ?? 0}%`,
+                })
+              )}
+              emptyMessage="Tiada data leaderboard untuk tempoh ini."
+            />
           </div>
 
           <div>
