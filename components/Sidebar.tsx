@@ -99,6 +99,12 @@ export default function Sidebar({
           show: canKeyInSale(role, positionCode) || manager,
         },
         {
+          href: "/dashboard/laporan-whatsapp",
+          label: "Laporan WhatsApp",
+          icon: "📱",
+          show: true,
+        },
+        {
           href: "/dashboard/prestasi-konten",
           label: "Prestasi Konten",
           icon: "🎬",

@@ -1,0 +1,59 @@
+PEMASANG BRIDGE WHATSAPP - MASDORA TEAM DASHBOARD
+==================================================
+
+APA INI?
+--------
+Program kecil yang duduk di komputer ini dan menyambung ke WhatsApp
+(macam WhatsApp Web). Setiap mesej dalam group WhatsApp team akan
+dihantar terus ke dashboard secara automatik.
+
+
+SEBELUM MULA - BACA INI
+-----------------------
+1. Komputer ini KENA SENTIASA HIDUP supaya mesej terus masuk.
+   Kalau komputer ditutup, mesej berhenti masuk sampai ia dibuka semula.
+
+2. Ini menggunakan kaedah TIDAK RASMI (WhatsApp tiada API rasmi untuk
+   baca mesej group). Ada risiko kecil akaun WhatsApp disekat.
+   Cadangan: guna nombor WhatsApp kerja, bukan nombor peribadi.
+
+3. Setiap ~20 hari, WhatsApp mungkin minta imbas QR semula.
+
+
+CARA PASANG
+-----------
+1. Klik dua kali fail "PASANG.bat"
+
+2. Bila Windows tanya kebenaran (popup biru/kuning), klik "Yes"
+   - Ini akan berlaku beberapa kali. Klik Yes setiap kali.
+
+3. Tunggu 5-15 minit. Jangan tutup tetingkap hitam itu.
+
+4. Di hujung, QR code akan muncul. Imbas dengan telefon:
+   - Buka WhatsApp di telefon
+   - Tekan tiga titik (menu) di penjuru atas
+   - Pilih "Linked Devices" / "Peranti Berpaut"
+   - Tekan "Link a Device" / "Paut Peranti"
+   - Halakan kamera ke QR code
+
+5. Selesai. Mesej akan mula masuk ke dashboard dalam beberapa minit.
+
+
+KALAU QR CODE TIDAK MUNCUL
+--------------------------
+Klik dua kali fail "LIHAT-QR.bat"
+
+
+KALAU ADA MASALAH
+-----------------
+Beritahu Claude, dan sertakan:
+- Mesej ralat yang keluar (ambil gambar skrin)
+- Kandungan fail: C:\Dev\whatsapp-mcp-go\whatsapp-bridge\bridge.err
+
+
+LANGKAH PENTING SEBELUM PASANG
+------------------------------
+Pastikan fail SQL ini sudah di-run di Supabase dahulu:
+   add-whatsapp-reports.sql
+
+Tanpa itu, mesej tiada tempat untuk disimpan.
