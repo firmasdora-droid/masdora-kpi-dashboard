@@ -62,6 +62,18 @@ export default function AdminUsersPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // ---- Reset kata laluan ----
+  const [myId, setMyId] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState<Profile | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetDone, setResetDone] = useState<{
+    fullName: string;
+    email: string;
+    newPassword: string;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     const [
@@ -89,6 +101,39 @@ export default function AdminUsersPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setMyId(data.user?.id ?? null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleResetPassword(target: Profile) {
+    setResetting(true);
+    setResetError(null);
+    setResetDone(null);
+    setCopied(false);
+    try {
+      const res = await fetch("/api/admin/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: target.id }),
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        setResetError(json.error ?? "Gagal reset kata laluan.");
+      } else {
+        setResetDone({
+          fullName: json.fullName,
+          email: json.email,
+          newPassword: json.newPassword,
+        });
+      }
+    } catch {
+      setResetError("Gagal menghubungi pelayan. Cuba lagi.");
+    }
+    setResetting(false);
+    setConfirmReset(null);
+  }
 
   async function handleCreateInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -307,6 +352,7 @@ export default function AdminUsersPage() {
                   <th>Jabatan</th>
                   <th>Jawatan</th>
                   <th>Aktif</th>
+                  <th>Kata Laluan</th>
                 </tr>
               </thead>
               <tbody>
@@ -318,6 +364,24 @@ export default function AdminUsersPage() {
                     <td>{p.dept_code}</td>
                     <td>{p.position_code}</td>
                     <td>{p.active ? "Ya" : "Tidak"}</td>
+                    <td>
+                      {p.id === myId ? (
+                        <span className="text-[11px] text-slate-500">
+                          (akaun anda)
+                        </span>
+                      ) : p.role === "ceo" ? (
+                        <span className="text-[11px] text-slate-500">
+                          (dilindungi)
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmReset(p)}
+                          className="rounded-lg border border-masdora-orange/40 px-2.5 py-1 text-[11px] font-bold text-amber-200 transition hover:bg-masdora-orange/15"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -325,6 +389,143 @@ export default function AdminUsersPage() {
           </motion.div>
         )}
       </div>
+
+      {/* ---------- Pengesahan sebelum reset ---------- */}
+      {confirmReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/70"
+            onClick={() => setConfirmReset(null)}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            className="relative z-10 w-full max-w-md rounded-2xl border border-masdora-alert/40 bg-navy-soft p-6"
+          >
+            <p className="text-lg font-bold text-white">
+              Reset kata laluan {confirmReset.full_name}?
+            </p>
+            <p className="mt-2 text-sm text-slate-300">
+              Kata laluan lama dia akan <strong>terus berhenti berfungsi</strong>.
+              Dia tidak akan boleh log masuk sampai anda beri kata laluan baru
+              kepadanya.
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              Kata laluan baru hanya dipaparkan <strong>sekali</strong>. Salin dan
+              hantar kepadanya sebelum tutup.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="btn-secondary"
+                onClick={() => setConfirmReset(null)}
+                disabled={resetting}
+              >
+                Batal
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => handleResetPassword(confirmReset)}
+                disabled={resetting}
+              >
+                {resetting ? "Menukar..." : "Ya, Reset"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ---------- Kata laluan baru ---------- */}
+      {resetDone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70" />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            className="relative z-10 w-full max-w-md rounded-2xl border border-masdora-olive/45 bg-navy-soft p-6"
+          >
+            <p className="text-lg font-bold text-emerald-200">
+              Kata laluan {resetDone.fullName} sudah ditukar
+            </p>
+
+            <div className="mt-4 space-y-3 rounded-xl border border-white/10 bg-white/[0.04] p-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Emel log masuk
+                </p>
+                <p className="font-mono text-sm text-slate-200">
+                  {resetDone.email}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Kata laluan baru
+                </p>
+                <p className="select-all font-mono text-lg font-bold text-white">
+                  {resetDone.newPassword}
+                </p>
+              </div>
+            </div>
+
+            <button
+              className="btn-secondary mt-3 w-full"
+              onClick={() => {
+                navigator.clipboard
+                  ?.writeText(
+                    `Emel: ${resetDone.email}\nKata laluan baru: ${resetDone.newPassword}`
+                  )
+                  .then(() => setCopied(true))
+                  .catch(() => setCopied(false));
+              }}
+            >
+              {copied ? "Sudah disalin" : "Salin emel & kata laluan"}
+            </button>
+
+            <p className="mt-4 text-xs text-amber-200">
+              Hantar kepada {resetDone.fullName} sekarang. Selepas tutup, kata
+              laluan ini tidak boleh dilihat lagi — anda perlu reset semula.
+            </p>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  setResetDone(null);
+                  setCopied(false);
+                }}
+              >
+                Sudah saya hantar
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {resetError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/70"
+            onClick={() => setResetError(null)}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative z-10 w-full max-w-md rounded-2xl border border-masdora-alert/45 bg-navy-soft p-6"
+          >
+            <p className="font-bold text-red-200">Gagal reset kata laluan</p>
+            <p className="mt-2 text-sm text-slate-300">{resetError}</p>
+            <div className="mt-4 flex justify-end">
+              <button
+                className="btn-secondary"
+                onClick={() => setResetError(null)}
+              >
+                Tutup
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

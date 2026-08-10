@@ -34,6 +34,14 @@ export default function ProfilePage() {
     photo_url: "",
   });
 
+  // ---- Tukar kata laluan sendiri ----
+  const [pw, setPw] = useState({ baru: "", ulang: "" });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMessage, setPwMessage] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     const {
@@ -104,6 +112,37 @@ export default function ProfilePage() {
     }
     setMessage("Profil berjaya dikemas kini.");
     load();
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwMessage(null);
+
+    if (pw.baru.length < 8) {
+      setPwMessage({
+        ok: false,
+        text: "Kata laluan perlu sekurang-kurangnya 8 aksara.",
+      });
+      return;
+    }
+    if (pw.baru !== pw.ulang) {
+      setPwMessage({ ok: false, text: "Kedua-dua kata laluan tidak sama." });
+      return;
+    }
+
+    setPwSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: pw.baru });
+    setPwSaving(false);
+
+    if (error) {
+      setPwMessage({ ok: false, text: "Gagal menukar: " + error.message });
+      return;
+    }
+    setPw({ baru: "", ulang: "" });
+    setPwMessage({
+      ok: true,
+      text: "Kata laluan berjaya ditukar. Guna kata laluan baru pada log masuk seterusnya.",
+    });
   }
 
   if (loading) {
@@ -197,6 +236,61 @@ export default function ProfilePage() {
         <div className="md:col-span-2">
           <button type="submit" className="btn-primary" disabled={saving}>
             {saving ? "Menyimpan..." : "Simpan Perubahan"}
+          </button>
+        </div>
+      </motion.form>
+
+      <motion.form
+        {...cardMotion}
+        transition={{ ...cardMotion.transition, delay: 0.12 }}
+        onSubmit={handleChangePassword}
+        className="card grid grid-cols-1 gap-4 md:grid-cols-2"
+      >
+        <div className="md:col-span-2">
+          <h3 className="font-semibold text-white">Tukar Kata Laluan</h3>
+          <p className="mt-1 text-xs text-muted">
+            Untuk keselamatan, tukar kata laluan sementara yang diberi oleh
+            manager kepada kata laluan anda sendiri.
+          </p>
+        </div>
+        <div>
+          <label className="label">Kata Laluan Baru</label>
+          <input
+            type="password"
+            className="input"
+            autoComplete="new-password"
+            value={pw.baru}
+            onChange={(e) => setPw({ ...pw, baru: e.target.value })}
+            placeholder="Sekurang-kurangnya 8 aksara"
+          />
+        </div>
+        <div>
+          <label className="label">Ulang Kata Laluan Baru</label>
+          <input
+            type="password"
+            className="input"
+            autoComplete="new-password"
+            value={pw.ulang}
+            onChange={(e) => setPw({ ...pw, ulang: e.target.value })}
+            placeholder="Taip semula"
+          />
+        </div>
+        {pwMessage && (
+          <p
+            className={`text-sm md:col-span-2 ${
+              pwMessage.ok ? "text-emerald-300" : "text-red-300"
+            }`}
+          >
+            {pwMessage.text}
+          </p>
+        )}
+        <div className="md:col-span-2">
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={pwSaving || !pw.baru || !pw.ulang}
+          >
+            {pwSaving ? "Menukar..." : "Tukar Kata Laluan"}
           </button>
         </div>
       </motion.form>
