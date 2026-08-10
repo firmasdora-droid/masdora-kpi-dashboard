@@ -64,6 +64,11 @@ export default function Sidebar({
     positionCode ?? ""
   );
 
+  // Graphic Designer — mereka guna sheet task list grafik.
+  const isDesigner = ["GD_SOCIAL", "GD_CATALOG", "GD_SHOPEE", "GD"].includes(
+    positionCode ?? ""
+  );
+
   const groups: NavGroup[] = [
     {
       title: "Kerja Saya",
@@ -109,6 +114,12 @@ export default function Sidebar({
           label: "Prestasi Konten",
           icon: "🎬",
           show: isContentTeam || manager || role === "ceo",
+        },
+        {
+          href: "/dashboard/tugasan-grafik",
+          label: "Tugasan Grafik",
+          icon: "🎨",
+          show: isDesigner || manager || role === "ceo",
         },
         {
           href: "/dashboard/isu-pelanggan",
