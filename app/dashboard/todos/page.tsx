@@ -57,6 +57,25 @@ function isBeforeDeadline(): boolean {
   return now.getHours() < 17;
 }
 
+/** Berapa lama lagi sebelum Jumaat 5:00 petang minggu ini. */
+function bakiMasa(): string | null {
+  const now = new Date();
+  const day = now.getDay();
+  if (day === 6 || day === 0) return null; // hujung minggu — dah tutup
+  const deadline = new Date(now);
+  deadline.setDate(now.getDate() + (5 - day));
+  deadline.setHours(17, 0, 0, 0);
+  const ms = deadline.getTime() - now.getTime();
+  if (ms <= 0) return null;
+  const jam = Math.floor(ms / 3_600_000);
+  if (jam >= 24) {
+    const hari = Math.floor(jam / 24);
+    return `${hari} hari ${jam % 24} jam lagi`;
+  }
+  const minit = Math.floor((ms % 3_600_000) / 60_000);
+  return `${jam} jam ${minit} minit lagi`;
+}
+
 export default function TodosPage() {
   const supabase = createClient();
   const [role, setRole] = useState<string | null>(null);
@@ -221,23 +240,97 @@ export default function TodosPage() {
         </p>
       </div>
 
-      <motion.div {...cardMotion} className="card space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <WeekPicker value={week} onChange={setWeek} />
-          <div className="text-right">
-            <p className="text-xs text-muted">
-              {submission?.submitted_at
-                ? `Dihantar pada ${new Date(submission.submitted_at).toLocaleString(
-                    "ms-MY"
-                  )} - ${submission.on_time ? "Tepat masa" : "Lewat"}`
-                : "Belum dihantar minggu ini"}
-            </p>
-            <button className="btn-primary mt-2" onClick={handleSubmitWeek}>
-              Hantar minggu ini
+      <motion.div {...cardMotion} className="card">
+        <WeekPicker value={week} onChange={setWeek} />
+      </motion.div>
+
+      {/* Banner penghantaran — sengaja besar supaya tiada siapa terlepas pandang */}
+      <motion.div
+        {...cardMotion}
+        transition={{ ...cardMotion.transition, delay: 0.04 }}
+        className={`rounded-2xl border p-5 ${
+          submission?.submitted_at
+            ? "border-masdora-olive/40 bg-gradient-to-br from-masdora-olive/20 to-masdora-olive/5"
+            : "border-masdora-alert/45 bg-gradient-to-br from-masdora-alert/20 to-masdora-alert/5"
+        }`}
+      >
+        {submission?.submitted_at ? (
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <motion.span
+                className="text-3xl"
+                initial={{ scale: 0.4, rotate: -20 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 320, damping: 13 }}
+                aria-hidden
+              >
+                ✅
+              </motion.span>
+              <div>
+                <p className="font-bold text-emerald-200">
+                  Sudah dihantar
+                  {submission.on_time ? " — tepat pada masanya" : " — tetapi lewat"}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {new Date(submission.submitted_at).toLocaleString("ms-MY")}
+                </p>
+              </div>
+            </div>
+            <button className="btn-secondary" onClick={handleSubmitWeek}>
+              Hantar semula (kemas kini)
             </button>
           </div>
-        </div>
-        {message && <p className="text-sm text-brand-400">{message}</p>}
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <motion.span
+                className="text-3xl"
+                animate={{ scale: [1, 1.14, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                aria-hidden
+              >
+                ⚠️
+              </motion.span>
+              <div>
+                <p className="font-bold text-red-200">
+                  BELUM DIHANTAR — Manager belum terima laporan anda
+                </p>
+                <p className="text-xs text-slate-300">
+                  Isi tugasan sahaja <strong>tidak cukup</strong>. Anda WAJIB tekan
+                  butang di sebelah sebelum Jumaat 5:00 petang.
+                  {bakiMasa() ? (
+                    <span className="ml-1 font-bold text-amber-300">
+                      Baki masa: {bakiMasa()}
+                    </span>
+                  ) : (
+                    <span className="ml-1 font-bold text-red-300">
+                      Tarikh akhir sudah lepas.
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <motion.button
+              className="btn-primary px-6 py-3 text-base"
+              onClick={handleSubmitWeek}
+              animate={{
+                boxShadow: [
+                  "0 0 0px rgba(242,97,34,0)",
+                  "0 0 20px rgba(242,97,34,0.6)",
+                  "0 0 0px rgba(242,97,34,0)",
+                ],
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              Hantar Sekarang
+            </motion.button>
+          </div>
+        )}
+        {message && (
+          <p className="mt-3 border-t border-white/10 pt-3 text-sm font-semibold text-white">
+            {message}
+          </p>
+        )}
       </motion.div>
 
       <motion.div {...cardMotion} transition={{ ...cardMotion.transition, delay: 0.06 }} className="card">
