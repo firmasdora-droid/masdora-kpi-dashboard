@@ -128,6 +128,11 @@ export default function TeamTodoReport() {
   const submitted = rows.filter((r) => r.submission?.submitted_at).length;
   const onTime = rows.filter((r) => r.submission?.on_time).length;
   const notSubmitted = rows.length - submitted;
+  // Ada isi tugasan tetapi tidak tekan "Hantar" — kerja ada, cuma lupa hantar.
+  const forgotSubmit = rows.filter(
+    (r) => !r.submission?.submitted_at && r.total > 0
+  ).length;
+  const noActivity = notSubmitted - forgotSubmit;
   const avgPct =
     rows.length > 0
       ? Math.round(rows.reduce((s, r) => s + r.pct, 0) / rows.length)
@@ -169,7 +174,7 @@ export default function TeamTodoReport() {
           index={0}
           label="Belum Hantar"
           value={String(notSubmitted)}
-          caption="perlu dikejar"
+          caption={`${forgotSubmit} lupa tekan hantar · ${noActivity} tiada aktiviti`}
           accent="from-masdora-alert/20 to-masdora-alert/5 border-masdora-alert/25"
         />
         <StatCard
@@ -206,11 +211,16 @@ export default function TeamTodoReport() {
           {rows.map((r, i) => {
             const isOpen = expanded === r.profile.id;
             const sub = r.submission;
-            const statusPill = !sub?.submitted_at
-              ? { label: "Belum hantar", cls: "pill-merah" }
-              : sub.on_time
-              ? { label: "Tepat masa", cls: "pill-hijau" }
-              : { label: "Lewat", cls: "pill-oren" };
+            // Bezakan dua keadaan yang SANGAT berbeza:
+            //  - ada tugasan tetapi lupa tekan "Hantar"  -> kerja ada, cuma lupa
+            //  - tiada tugasan sama sekali               -> memang tak buat apa-apa
+            const statusPill = sub?.submitted_at
+              ? sub.on_time
+                ? { label: "Tepat masa", cls: "pill-hijau" }
+                : { label: "Lewat", cls: "pill-oren" }
+              : r.total > 0
+              ? { label: "Lupa tekan hantar", cls: "pill-oren" }
+              : { label: "Tiada aktiviti", cls: "pill-merah" };
 
             return (
               <motion.div
@@ -263,6 +273,18 @@ export default function TeamTodoReport() {
 
                 {isOpen && (
                   <div className="mt-4 space-y-2 border-t border-white/5 pt-4">
+                    {!sub?.submitted_at && r.total > 0 && (
+                      <div className="rounded-lg border border-masdora-orange/30 bg-masdora-orange/10 p-3">
+                        <p className="text-xs font-bold text-amber-200">
+                          Dia ADA buat kerja ({r.total} tugasan direkod) tetapi
+                          tidak tekan butang &ldquo;Hantar&rdquo;.
+                        </p>
+                        <p className="mt-1 text-[11px] text-slate-400">
+                          Minta dia buka Weekly To-Do List Team dan tekan butang
+                          merah &ldquo;Hantar Sekarang&rdquo;.
+                        </p>
+                      </div>
+                    )}
                     {r.todos.length === 0 ? (
                       <p className="text-sm text-muted">
                         Belum ada tugasan dimasukkan untuk minggu ini.
