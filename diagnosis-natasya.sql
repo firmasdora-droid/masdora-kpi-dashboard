@@ -1,8 +1,9 @@
 -- ==========================================================================
 -- DIAGNOSIS: kenapa Natasya masih "BELUM HANTAR"?
 --
--- Run SEMUA sekali. Akan keluar 4 jadual hasil. Hantar screenshot
--- KEEMPAT-EMPATNYA kepada saya.
+-- Run SEMUA sekali. Akan keluar 5 jadual hasil (A hingga E).
+-- Hantar screenshot KELIMA-LIMANYA kepada saya.
+-- Yang PALING PENTING ialah bahagian E.
 --
 -- Selamat sepenuhnya — fail ini HANYA BACA, tiada apa yang diubah.
 -- ==========================================================================
@@ -10,13 +11,9 @@
 -- ---------- A) Semua rekod penghantaran Natasya (semua minggu, semua bulan) --
 select
   'A. PENGHANTARAN NATASYA' as bahagian,
-  ws.year,
-  ws.month,
-  ws.week,
-  ws.submitted_at,
   to_char(ws.submitted_at at time zone 'Asia/Kuala_Lumpur', 'Dy DD-Mon-YYYY HH24:MI')
     as masa_malaysia,
-  ws.on_time
+  ws.*
 from weekly_submissions ws
 join profiles p on p.id = ws.user_id
 where p.full_name ilike '%natas%'
@@ -31,7 +28,7 @@ select
   count(*) as bilangan_tugasan,
   round(avg(t.pct)) as purata_peratus,
   min(t.created_at) as tugasan_pertama_dibuat,
-  max(t.updated_at) as kali_terakhir_diubah
+  max(t.created_at) as tugasan_terakhir_dibuat
 from todos t
 join profiles p on p.id = t.user_id
 where p.full_name ilike '%natas%'
@@ -41,11 +38,7 @@ order by t.year, t.month, t.week;
 -- ---------- C) Senarai penuh tugasan Natasya bulan Ogos 2026 ---------------
 select
   'C. BUTIRAN TUGASAN OGOS' as bahagian,
-  t.week,
-  t.title,
-  t.pct,
-  t.status,
-  t.priority
+  t.*
 from todos t
 join profiles p on p.id = t.user_id
 where p.full_name ilike '%natas%'
@@ -60,8 +53,7 @@ select
   p.full_name,
   ws.year, ws.month, ws.week,
   to_char(ws.submitted_at at time zone 'Asia/Kuala_Lumpur', 'Dy DD-Mon HH24:MI')
-    as masa_malaysia,
-  ws.on_time
+    as masa_malaysia
 from weekly_submissions ws
 join profiles p on p.id = ws.user_id
 where ws.year = 2026 and ws.month = 8
