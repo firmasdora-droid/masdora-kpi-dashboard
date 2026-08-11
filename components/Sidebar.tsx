@@ -152,6 +152,12 @@ export default function Sidebar({
       title: "Urus",
       items: [
         {
+          href: "/dashboard/laporan-mingguan",
+          label: "Laporan Mingguan (PDF)",
+          icon: "📄",
+          show: manager || role === "ceo",
+        },
+        {
           href: "/dashboard/campaigns",
           label: "Kempen & Pelancaran",
           icon: "🎉",

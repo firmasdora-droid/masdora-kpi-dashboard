@@ -80,3 +80,72 @@ export function buildWeekOptions(year: number): WeekOption[] {
 export function monthName(month: number): string {
   return BULAN_MS[month - 1] ?? String(month);
 }
+
+export interface WeekRange {
+  /** Tarikh mula, format "YYYY-MM-DD". */
+  startIso: string;
+  /** Tarikh akhir (termasuk), format "YYYY-MM-DD". */
+  endIso: string;
+  /** Contoh: "8 - 14 Ogos 2026" */
+  label: string;
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/**
+ * Tarikh sebenar bagi satu minggu dalam bulan.
+ *
+ * Selari dengan weekOfDate(): minggu 1 = hari 1-7, minggu 2 = 8-14,
+ * minggu 3 = 15-21, minggu 4 = 22 hingga hari terakhir bulan itu.
+ * Minggu 4 memang lebih panjang (7-10 hari) kerana ia menelan baki bulan.
+ */
+export function weekDateRange(
+  year: number,
+  month: number,
+  week: number
+): WeekRange {
+  const w = Math.min(4, Math.max(1, week));
+  const lastDay = new Date(year, month, 0).getDate();
+  const startDay = (w - 1) * 7 + 1;
+  const endDay = w === 4 ? lastDay : Math.min(w * 7, lastDay);
+  return {
+    startIso: `${year}-${pad(month)}-${pad(startDay)}`,
+    endIso: `${year}-${pad(month)}-${pad(endDay)}`,
+    label: `${startDay} - ${endDay} ${monthName(month)} ${year}`,
+  };
+}
+
+/** Adakah tarikh ISO ("YYYY-MM-DD") berada dalam minggu ini? */
+export function isInWeek(iso: string | null | undefined, r: WeekRange): boolean {
+  if (!iso) return false;
+  const d = iso.slice(0, 10);
+  return d >= r.startIso && d <= r.endIso;
+}
+
+/** Gerak satu minggu ke depan/belakang, melangkaui sempadan bulan & tahun. */
+export function shiftWeek(
+  value: { year: number; month: number; week: number },
+  delta: number
+): { year: number; month: number; week: number } {
+  let { year, month, week } = value;
+  week += delta;
+  while (week > 4) {
+    week -= 4;
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  while (week < 1) {
+    week += 4;
+    month -= 1;
+    if (month < 1) {
+      month = 12;
+      year -= 1;
+    }
+  }
+  return { year, month, week };
+}

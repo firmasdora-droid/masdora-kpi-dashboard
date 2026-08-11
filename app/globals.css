@@ -114,3 +114,62 @@ body {
   color: rgb(155, 161, 168);
   border-color: rgba(155, 161, 168, 0.3);
 }
+
+/* ==========================================================================
+   CETAKAN PDF — Laporan Mingguan
+   Laporan dipapar atas "kertas putih" walaupun dashboard bertema gelap,
+   supaya PDF yang dihantar kepada CEO kelihatan seperti dokumen sebenar
+   dan tidak membazir dakwat hitam.
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
+  }
+
+  /* Sembunyikan segala-galanya, kemudian tunjukkan laporan sahaja. */
+  body * {
+    visibility: hidden;
+  }
+  #laporan-cetak,
+  #laporan-cetak * {
+    visibility: visible;
+  }
+  #laporan-cetak {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  /* Butang & kawalan tidak perlu dicetak. */
+  .tiada-cetak {
+    display: none !important;
+  }
+
+  /* Jangan potong seksyen di tengah-tengah. */
+  .cetak-blok {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .cetak-halaman-baru {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  /* Pastikan warna latar seksyen tetap keluar pada pencetak/PDF. */
+  .cetak-warna {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+}
