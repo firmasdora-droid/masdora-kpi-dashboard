@@ -342,3 +342,41 @@ export interface VSalesRankMonthly {
   pct_target: number | null;
   rank: number;
 }
+
+/** Akaun tempat konten disiarkan. */
+export const CONTENT_ACCOUNTS = [
+  "TIKTOK OS",
+  "TIKTOK MY",
+  "INSTAGRAM",
+  "SHOPEE HQ",
+  "SHOPEE OS",
+] as const;
+
+export type ContentAccount = (typeof CONTENT_ACCOUNTS)[number];
+
+/** Status satu rancangan konten. */
+export const CONTENT_PLAN_STATUSES = [
+  "dirancang",
+  "sedang buat",
+  "sedia",
+  "disiarkan",
+  "tangguh",
+] as const;
+
+export type ContentPlanStatus = (typeof CONTENT_PLAN_STATUSES)[number];
+
+/** Satu baris Content Planner. */
+export interface ContentPlan {
+  id: number;
+  user_id: string;
+  title: string;
+  /** "YYYY-MM-DD" */
+  post_date: string;
+  /** "HH:MM:SS" atau null kalau masa belum ditetapkan. */
+  post_time: string | null;
+  account: string;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}

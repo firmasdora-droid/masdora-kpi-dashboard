@@ -110,6 +110,12 @@ export default function Sidebar({
           show: true,
         },
         {
+          href: "/dashboard/content-planner",
+          label: "Content Planner",
+          icon: "🗓️",
+          show: isContentTeam || manager || role === "ceo",
+        },
+        {
           href: "/dashboard/prestasi-konten",
           label: "Prestasi Konten",
           icon: "🎬",

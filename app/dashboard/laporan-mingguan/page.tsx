@@ -4,8 +4,8 @@
  * Laporan Ringkas Mingguan — untuk Marketing Manager & CEO.
  *
  * Menghimpunkan SEMUA sumber dalam satu dokumen sedia-cetak:
- *   To-Do Team · Jualan · Prestasi Konten · Tugasan Grafik ·
- *   Isu Pelanggan · Recovery CRM · Kempen & Pelancaran
+ *   To-Do Team · Jualan · Prestasi Konten · Content Planner ·
+ *   Tugasan Grafik · Isu Pelanggan · Recovery CRM · Kempen & Pelancaran
  *
  * Laporan dipapar atas "kertas putih" walaupun dashboard bertema gelap,
  * supaya PDF yang dihantar kepada CEO kelihatan seperti dokumen sebenar.
@@ -25,7 +25,14 @@ import {
   type WeekRange,
 } from "@/lib/period";
 import MasdoraLogomark from "@/components/MasdoraLogomark";
-import type { Profile, Sale, Todo, WeeklySubmission } from "@/types/database";
+import {
+  CONTENT_ACCOUNTS,
+  type ContentPlan,
+  type Profile,
+  type Sale,
+  type Todo,
+  type WeeklySubmission,
+} from "@/types/database";
 
 // ---------------------------------------------------------------- jenis data
 
@@ -153,6 +160,7 @@ export default function LaporanMingguanPage() {
   const [tasks, setTasks] = useState<GraphicTask[]>([]);
   const [issues, setIssues] = useState<CsIssue[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignItem[]>([]);
+  const [plans, setPlans] = useState<ContentPlan[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -199,6 +207,7 @@ export default function LaporanMingguanPage() {
       { data: subRows },
       { data: saleRows, error: saleErr },
       { data: recoveryRows, error: recErr },
+      { data: planRows, error: planErr },
     ] = await Promise.all([
       supabase.from("profiles").select("*").eq("active", true).order("full_name"),
       supabase
@@ -223,16 +232,31 @@ export default function LaporanMingguanPage() {
         .select("id, customer_name, status, amount_rm, contacted_at, handler_code")
         .gte("contacted_at", range.startIso)
         .lte("contacted_at", range.endIso),
+      supabase
+        .from("content_plans")
+        .select("*")
+        .gte("post_date", range.startIso)
+        .lte("post_date", range.endIso)
+        .order("post_date")
+        .order("post_time", { nullsFirst: false }),
     ]);
 
     if (saleErr) warn.push("Jualan: " + saleErr.message);
     if (recErr) warn.push("Recovery CRM: " + recErr.message);
+    if (planErr) {
+      warn.push(
+        /content_plans|does not exist/i.test(planErr.message)
+          ? "Content Planner: jadual belum dibuat (run add-content-planner.sql)"
+          : "Content Planner: " + planErr.message
+      );
+    }
 
     setProfiles((profileRows as Profile[]) ?? []);
     setTodos((todoRows as Todo[]) ?? []);
     setSubs((subRows as WeeklySubmission[]) ?? []);
     setSales((saleRows as Sale[]) ?? []);
     setRecovery((recoveryRows as RecoveryRecord[]) ?? []);
+    setPlans((planRows as ContentPlan[]) ?? []);
 
     // Setiap sumber Google Sheet gagal secara berasingan, supaya satu sheet
     // yang bermasalah tidak mematikan seluruh laporan.
@@ -797,9 +821,47 @@ export default function LaporanMingguanPage() {
               )}
             </Seksyen>
 
-            {/* ---- 5. Tugasan Grafik ---- */}
+            {/* ---- 5. Content Planner ---- */}
             <Seksyen
               no="5"
+              tajuk="Content Planner"
+              nota="Konten yang dirancang untuk disiarkan dalam minggu ini."
+            >
+              {plans.length === 0 ? (
+                <Kosong>Tiada konten dirancang untuk minggu ini.</Kosong>
+              ) : (
+                <>
+                  <div className="mb-3 grid grid-cols-5 gap-3">
+                    {CONTENT_ACCOUNTS.map((a) => (
+                      <Kotak
+                        key={a}
+                        label={a}
+                        nilai={num(
+                          plans.filter((p) => p.account === a).length
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <Jadual
+                    kepala={["Tarikh", "Masa", "Tajuk", "Akaun", "Oleh", "Status"]}
+                    baris={plans.map((p) => [
+                      p.post_date.slice(8, 10) +
+                        "/" +
+                        p.post_date.slice(5, 7),
+                      p.post_time ? p.post_time.slice(0, 5) : "-",
+                      p.title,
+                      p.account,
+                      nameById.get(p.user_id) ?? "-",
+                      p.status,
+                    ])}
+                  />
+                </>
+              )}
+            </Seksyen>
+
+            {/* ---- 6. Tugasan Grafik ---- */}
+            <Seksyen
+              no="6"
               tajuk="Tugasan Grafik"
               nota="Termasuk tugasan yang diberi ATAU bertarikh akhir dalam minggu ini."
             >
@@ -848,8 +910,8 @@ export default function LaporanMingguanPage() {
               )}
             </Seksyen>
 
-            {/* ---- 6. Isu Pelanggan ---- */}
-            <Seksyen no="6" tajuk="Isu Pelanggan">
+            {/* ---- 7. Isu Pelanggan ---- */}
+            <Seksyen no="7" tajuk="Isu Pelanggan">
               {issuesWeek.length === 0 ? (
                 <Kosong>Tiada isu pelanggan baru dilaporkan.</Kosong>
               ) : (
@@ -872,9 +934,9 @@ export default function LaporanMingguanPage() {
               )}
             </Seksyen>
 
-            {/* ---- 7. Recovery CRM ---- */}
+            {/* ---- 8. Recovery CRM ---- */}
             <Seksyen
-              no="7"
+              no="8"
               tajuk="Recovery CRM"
               nota={`${recovery.length} rekod dihubungi · nilai ${rm(
                 recoveryTotal
@@ -890,8 +952,8 @@ export default function LaporanMingguanPage() {
               )}
             </Seksyen>
 
-            {/* ---- 8. Kempen ---- */}
-            <Seksyen no="8" tajuk="Kempen & Pelancaran">
+            {/* ---- 9. Kempen ---- */}
+            <Seksyen no="9" tajuk="Kempen & Pelancaran">
               <SubTajuk>Dilancarkan Minggu Ini</SubTajuk>
               {campaignsWeek.length === 0 ? (
                 <Kosong>Tiada pelancaran dalam minggu ini.</Kosong>
