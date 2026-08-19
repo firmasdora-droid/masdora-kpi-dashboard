@@ -460,30 +460,6 @@ export default function ContentPlannerPage() {
         </div>
       </motion.form>
 
-      {/* ---------- Ringkasan per akaun (boleh klik untuk tapis) ---------- */}
-      {plans.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          {CONTENT_ACCOUNTS.map((a, i) => (
-            <motion.button
-              key={a}
-              {...cardMotion}
-              transition={{ ...cardMotion.transition, delay: i * 0.05 }}
-              onClick={() => setAccountFilter(accountFilter === a ? "" : a)}
-              className={`rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-left transition hover:bg-white/[0.08] ${
-                accountFilter === a ? "ring-2 ring-masdora-orange/60" : ""
-              }`}
-            >
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {a}
-              </p>
-              <p className="mt-1 text-xl font-black text-white">
-                {perAccount.get(a) ?? 0}
-              </p>
-            </motion.button>
-          ))}
-        </div>
-      )}
-
       {/* ---------- Tapisan ---------- */}
       <motion.div {...cardMotion} className="card flex flex-wrap items-end gap-4">
         <div>
@@ -544,10 +520,12 @@ export default function ContentPlannerPage() {
       {paparan === "kalendar" && !loading && (
         <motion.div {...cardMotion} className="card">
           <div className="mb-2 grid grid-cols-7 gap-1.5">
-            {HARI_PENDEK.map((h) => (
+            {HARI_PENDEK.map((h, i) => (
               <p
                 key={h}
-                className="text-center text-[10px] font-bold uppercase tracking-wider text-slate-500"
+                className={`rounded py-1 text-center text-xs font-bold uppercase tracking-wider ${
+                  i >= 5 ? "text-slate-600" : "text-slate-400"
+                }`}
               >
                 {h}
               </p>
@@ -560,7 +538,7 @@ export default function ContentPlannerPage() {
                 return (
                   <div
                     key={`kosong-${i}`}
-                    className="min-h-[92px] rounded-lg border border-white/[0.03]"
+                    className="min-h-[124px] rounded-lg border border-white/[0.03]"
                   />
                 );
               }
@@ -577,7 +555,7 @@ export default function ContentPlannerPage() {
                     setPilihHari(dipilih ? null : iso);
                     setDraft((d) => ({ ...d, post_date: iso }));
                   }}
-                  className={`min-h-[92px] rounded-lg border p-1.5 text-left align-top transition ${
+                  className={`min-h-[124px] rounded-lg border p-2 text-left align-top transition ${
                     dipilih
                       ? "border-masdora-orange/70 bg-masdora-orange/10"
                       : hariIni
@@ -587,16 +565,18 @@ export default function ContentPlannerPage() {
                       : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
                   }`}
                 >
-                  <div className="mb-1 flex items-center justify-between">
+                  <div className="mb-1.5 flex items-center justify-between">
                     <span
-                      className={`text-[11px] font-bold ${
-                        hariIni ? "text-masdora-orange" : "text-slate-400"
+                      className={`text-sm font-black ${
+                        hariIni
+                          ? "flex h-6 w-6 items-center justify-center rounded-full bg-masdora-orange text-white"
+                          : "text-slate-300"
                       }`}
                     >
                       {Number(iso.slice(8, 10))}
                     </span>
                     {items.length > 0 && (
-                      <span className="text-[9px] font-bold text-slate-500">
+                      <span className="rounded bg-white/10 px-1.5 text-[10px] font-bold text-slate-300">
                         {items.length}
                       </span>
                     )}
@@ -606,7 +586,7 @@ export default function ContentPlannerPage() {
                     {items.slice(0, 3).map((plan) => (
                       <div
                         key={plan.id}
-                        className="flex items-center gap-1 rounded border-l-2 bg-white/[0.06] px-1 py-0.5"
+                        className="rounded border-l-[3px] bg-white/[0.07] px-1.5 py-1"
                         style={{
                           borderLeftColor:
                             ACCOUNT_COLOR[plan.account] ?? "#8FA3B8",
@@ -616,17 +596,17 @@ export default function ContentPlannerPage() {
                         } · ${nameById.get(plan.user_id) ?? "-"}`}
                       >
                         {plan.post_time && (
-                          <span className="flex-shrink-0 text-[8px] font-bold text-slate-400">
+                          <p className="text-[10px] font-bold leading-tight text-masdora-orange">
                             {plan.post_time.slice(0, 5)}
-                          </span>
+                          </p>
                         )}
-                        <span className="truncate text-[9px] leading-tight text-slate-200">
+                        <p className="truncate text-[11px] font-semibold leading-tight text-slate-100">
                           {plan.title}
-                        </span>
+                        </p>
                       </div>
                     ))}
                     {items.length > 3 && (
-                      <p className="text-[9px] font-bold text-masdora-orange">
+                      <p className="text-[10px] font-bold text-masdora-orange">
                         +{items.length - 3} lagi
                       </p>
                     )}
@@ -636,21 +616,30 @@ export default function ContentPlannerPage() {
             })}
           </div>
 
-          {/* Petunjuk warna akaun */}
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/10 pt-3">
+          {/* Petunjuk warna akaun — juga berfungsi sebagai tapisan & kiraan */}
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
             {CONTENT_ACCOUNTS.map((a) => (
-              <span key={a} className="flex items-center gap-1.5">
+              <button
+                key={a}
+                onClick={() => setAccountFilter(accountFilter === a ? "" : a)}
+                className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 transition ${
+                  accountFilter === a
+                    ? "border-masdora-orange/60 bg-masdora-orange/10"
+                    : "border-white/10 hover:bg-white/5"
+                }`}
+              >
                 <span
                   className="h-2.5 w-2.5 rounded-sm"
                   style={{ background: ACCOUNT_COLOR[a] }}
                 />
-                <span className="text-[10px] font-semibold text-slate-400">
-                  {a}
+                <span className="text-[10px] font-bold text-slate-300">{a}</span>
+                <span className="text-[10px] font-black text-white">
+                  {perAccount.get(a) ?? 0}
                 </span>
-              </span>
+              </button>
             ))}
-            <span className="text-[10px] text-slate-500">
-              Klik mana-mana hari untuk lihat butiran & isi tarikh borang.
+            <span className="ml-auto text-[10px] text-slate-500">
+              Klik hari untuk lihat butiran &amp; isi tarikh borang
             </span>
           </div>
         </motion.div>
