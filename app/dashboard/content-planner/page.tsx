@@ -38,6 +38,15 @@ const ACCOUNT_PILL: Record<string, string> = {
   "SHOPEE OS": "pill-kosong",
 };
 
+/** Warna tegas bagi setiap akaun — untuk titik & jalur dalam kalendar. */
+const ACCOUNT_COLOR: Record<string, string> = {
+  "TIKTOK OS": "#F26122",
+  "TIKTOK MY": "#FDE585",
+  INSTAGRAM: "#D9432A",
+  "SHOPEE HQ": "#6B8042",
+  "SHOPEE OS": "#8FA3B8",
+};
+
 const STATUS_PILL: Record<string, string> = {
   dirancang: "pill-kosong",
   "sedang buat": "pill-kuning",
@@ -47,6 +56,27 @@ const STATUS_PILL: Record<string, string> = {
 };
 
 const HARI = ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"];
+
+/** Kepala kalendar — minggu bermula hari Isnin (kebiasaan tempat kerja). */
+const HARI_PENDEK = ["Isn", "Sel", "Rab", "Kha", "Jum", "Sab", "Ahd"];
+
+/**
+ * Bina petak kalendar untuk satu bulan, bermula hari Isnin.
+ * Petak kosong di awal & akhir diwakili oleh null supaya grid kekal 7 lajur.
+ */
+function binaPetak(year: number, month: number): (string | null)[] {
+  const lastDay = new Date(year, month, 0).getDate();
+  // getDay(): 0=Ahad. Tukar supaya Isnin=0 ... Ahad=6
+  const firstDow = (new Date(year, month - 1, 1).getDay() + 6) % 7;
+  const p = (n: number) => String(n).padStart(2, "0");
+
+  const petak: (string | null)[] = Array(firstDow).fill(null);
+  for (let d = 1; d <= lastDay; d++) {
+    petak.push(`${year}-${p(month)}-${p(d)}`);
+  }
+  while (petak.length % 7 !== 0) petak.push(null);
+  return petak;
+}
 
 function todayIso(): string {
   const d = new Date();
@@ -99,6 +129,9 @@ export default function ContentPlannerPage() {
 
   const [ownerFilter, setOwnerFilter] = useState("");
   const [accountFilter, setAccountFilter] = useState("");
+  const [paparan, setPaparan] = useState<"kalendar" | "senarai">("kalendar");
+  /** Hari yang dipilih dalam kalendar — panel butiran dipapar di bawahnya. */
+  const [pilihHari, setPilihHari] = useState<string | null>(null);
 
   const isManagerRole = me?.role === "manager" || me?.role === "ceo";
 
@@ -185,6 +218,19 @@ export default function ContentPlannerPage() {
     });
     return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [filtered]);
+
+  /** Rancangan dikumpulkan mengikut tarikh — untuk carian pantas kalendar. */
+  const mapByDate = useMemo(() => {
+    const m = new Map<string, ContentPlan[]>();
+    filtered.forEach((x) => {
+      const arr = m.get(x.post_date) ?? [];
+      arr.push(x);
+      m.set(x.post_date, arr);
+    });
+    return m;
+  }, [filtered]);
+
+  const petak = useMemo(() => binaPetak(ym.year, ym.month), [ym]);
 
   const perAccount = useMemo(() => {
     const m = new Map<string, number>();
@@ -476,10 +522,177 @@ export default function ContentPlannerPage() {
         <button className="btn-secondary" onClick={load} disabled={loading}>
           {loading ? "Memuatkan..." : "Muat Semula"}
         </button>
+
+        <div className="ml-auto flex gap-1 rounded-xl border border-white/10 p-1">
+          {(["kalendar", "senarai"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setPaparan(v)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold capitalize transition ${
+                paparan === v
+                  ? "bg-masdora-orange/20 text-amber-200"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              {v === "kalendar" ? "🗓️ Kalendar" : "☰ Senarai"}
+            </button>
+          ))}
+        </div>
       </motion.div>
 
-      {/* ---------- Senarai mengikut tarikh ---------- */}
-      {loading ? (
+      {/* ---------- Paparan KALENDAR ---------- */}
+      {paparan === "kalendar" && !loading && (
+        <motion.div {...cardMotion} className="card">
+          <div className="mb-2 grid grid-cols-7 gap-1.5">
+            {HARI_PENDEK.map((h) => (
+              <p
+                key={h}
+                className="text-center text-[10px] font-bold uppercase tracking-wider text-slate-500"
+              >
+                {h}
+              </p>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5">
+            {petak.map((iso, i) => {
+              if (!iso) {
+                return (
+                  <div
+                    key={`kosong-${i}`}
+                    className="min-h-[92px] rounded-lg border border-white/[0.03]"
+                  />
+                );
+              }
+
+              const items = mapByDate.get(iso) ?? [];
+              const hariIni = iso === todayIso();
+              const dipilih = pilihHari === iso;
+              const hujungMinggu = i % 7 >= 5;
+
+              return (
+                <button
+                  key={iso}
+                  onClick={() => {
+                    setPilihHari(dipilih ? null : iso);
+                    setDraft((d) => ({ ...d, post_date: iso }));
+                  }}
+                  className={`min-h-[92px] rounded-lg border p-1.5 text-left align-top transition ${
+                    dipilih
+                      ? "border-masdora-orange/70 bg-masdora-orange/10"
+                      : hariIni
+                      ? "border-masdora-orange/40 bg-white/[0.05]"
+                      : hujungMinggu
+                      ? "border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04]"
+                      : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                  }`}
+                >
+                  <div className="mb-1 flex items-center justify-between">
+                    <span
+                      className={`text-[11px] font-bold ${
+                        hariIni ? "text-masdora-orange" : "text-slate-400"
+                      }`}
+                    >
+                      {Number(iso.slice(8, 10))}
+                    </span>
+                    {items.length > 0 && (
+                      <span className="text-[9px] font-bold text-slate-500">
+                        {items.length}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    {items.slice(0, 3).map((plan) => (
+                      <div
+                        key={plan.id}
+                        className="flex items-center gap-1 rounded border-l-2 bg-white/[0.06] px-1 py-0.5"
+                        style={{
+                          borderLeftColor:
+                            ACCOUNT_COLOR[plan.account] ?? "#8FA3B8",
+                        }}
+                        title={`${masaCantik(plan.post_time)} · ${plan.title} · ${
+                          plan.account
+                        } · ${nameById.get(plan.user_id) ?? "-"}`}
+                      >
+                        {plan.post_time && (
+                          <span className="flex-shrink-0 text-[8px] font-bold text-slate-400">
+                            {plan.post_time.slice(0, 5)}
+                          </span>
+                        )}
+                        <span className="truncate text-[9px] leading-tight text-slate-200">
+                          {plan.title}
+                        </span>
+                      </div>
+                    ))}
+                    {items.length > 3 && (
+                      <p className="text-[9px] font-bold text-masdora-orange">
+                        +{items.length - 3} lagi
+                      </p>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Petunjuk warna akaun */}
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/10 pt-3">
+            {CONTENT_ACCOUNTS.map((a) => (
+              <span key={a} className="flex items-center gap-1.5">
+                <span
+                  className="h-2.5 w-2.5 rounded-sm"
+                  style={{ background: ACCOUNT_COLOR[a] }}
+                />
+                <span className="text-[10px] font-semibold text-slate-400">
+                  {a}
+                </span>
+              </span>
+            ))}
+            <span className="text-[10px] text-slate-500">
+              Klik mana-mana hari untuk lihat butiran & isi tarikh borang.
+            </span>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ---------- Butiran hari yang dipilih ---------- */}
+      {paparan === "kalendar" && pilihHari && (
+        <motion.div {...cardMotion} className="card">
+          <div className="mb-3 flex items-baseline justify-between border-b border-white/10 pb-2">
+            <p className="font-bold text-white">{tarikhCantik(pilihHari)}</p>
+            <button
+              className="text-xs font-bold text-slate-400 hover:text-white"
+              onClick={() => setPilihHari(null)}
+            >
+              Tutup
+            </button>
+          </div>
+          {(mapByDate.get(pilihHari) ?? []).length === 0 ? (
+            <p className="text-sm text-muted">
+              Tiada konten dirancang pada hari ini. Tarikh borang di atas sudah
+              ditetapkan ke hari ini — tinggal isi tajuk dan tekan Tambah.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {(mapByDate.get(pilihHari) ?? []).map((plan) => (
+                <BarisRancangan
+                  key={plan.id}
+                  plan={plan}
+                  nama={nameById.get(plan.user_id) ?? "-"}
+                  bolehUbah={bolehUbah(plan)}
+                  onEdit={() => mulaEdit(plan)}
+                  onDelete={() => handleDelete(plan)}
+                />
+              ))}
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* ---------- Paparan SENARAI ---------- */}
+      {paparan === "senarai" &&
+        (loading ? (
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : byDate.length === 0 ? (
         <motion.div
@@ -509,71 +722,85 @@ export default function ContentPlannerPage() {
 
               <div className="space-y-2">
                 {items.map((plan) => (
-                  <div
+                  <BarisRancangan
                     key={plan.id}
-                    className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
-                  >
-                    <span className="w-20 flex-shrink-0 text-xs font-bold text-masdora-orange">
-                      {masaCantik(plan.post_time)}
-                    </span>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-100">
-                        {plan.title}
-                      </p>
-                      {plan.notes && (
-                        <p className="truncate text-[11px] text-slate-500">
-                          {plan.notes}
-                        </p>
-                      )}
-                    </div>
-
-                    <span
-                      className={`pill ${
-                        ACCOUNT_PILL[plan.account] ?? "pill-kosong"
-                      }`}
-                    >
-                      {plan.account}
-                    </span>
-                    <span
-                      className={`pill ${
-                        STATUS_PILL[plan.status] ?? "pill-kosong"
-                      }`}
-                    >
-                      {plan.status}
-                    </span>
-
-                    <div className="flex flex-shrink-0 items-center gap-2">
-                      <AvatarInitials
-                        name={nameById.get(plan.user_id) ?? "?"}
-                        size={24}
-                      />
-                      <span className="hidden text-[11px] text-slate-400 sm:inline">
-                        {nameById.get(plan.user_id) ?? "-"}
-                      </span>
-                    </div>
-
-                    {bolehUbah(plan) && (
-                      <div className="flex flex-shrink-0 gap-1">
-                        <button
-                          onClick={() => mulaEdit(plan)}
-                          className="rounded-lg border border-white/15 px-2 py-1 text-[11px] font-bold text-slate-300 hover:bg-white/10"
-                        >
-                          Ubah
-                        </button>
-                        <button
-                          onClick={() => handleDelete(plan)}
-                          className="rounded-lg border border-masdora-alert/40 px-2 py-1 text-[11px] font-bold text-red-300 hover:bg-masdora-alert/15"
-                        >
-                          Padam
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                    plan={plan}
+                    nama={nameById.get(plan.user_id) ?? "-"}
+                    bolehUbah={bolehUbah(plan)}
+                    onEdit={() => mulaEdit(plan)}
+                    onDelete={() => handleDelete(plan)}
+                  />
                 ))}
               </div>
             </motion.div>
           ))}
+        </div>
+        ))}
+    </div>
+  );
+}
+
+/** Satu baris rancangan — dipakai oleh paparan senarai & panel hari kalendar. */
+function BarisRancangan({
+  plan,
+  nama,
+  bolehUbah,
+  onEdit,
+  onDelete,
+}: {
+  plan: ContentPlan;
+  nama: string;
+  bolehUbah: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <span
+        className="h-8 w-1 flex-shrink-0 rounded-full"
+        style={{ background: ACCOUNT_COLOR[plan.account] ?? "#8FA3B8" }}
+      />
+      <span className="w-20 flex-shrink-0 text-xs font-bold text-masdora-orange">
+        {masaCantik(plan.post_time)}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-slate-100">
+          {plan.title}
+        </p>
+        {plan.notes && (
+          <p className="truncate text-[11px] text-slate-500">{plan.notes}</p>
+        )}
+      </div>
+
+      <span className={`pill ${ACCOUNT_PILL[plan.account] ?? "pill-kosong"}`}>
+        {plan.account}
+      </span>
+      <span className={`pill ${STATUS_PILL[plan.status] ?? "pill-kosong"}`}>
+        {plan.status}
+      </span>
+
+      <div className="flex flex-shrink-0 items-center gap-2">
+        <AvatarInitials name={nama} size={24} />
+        <span className="hidden text-[11px] text-slate-400 sm:inline">
+          {nama}
+        </span>
+      </div>
+
+      {bolehUbah && (
+        <div className="flex flex-shrink-0 gap-1">
+          <button
+            onClick={onEdit}
+            className="rounded-lg border border-white/15 px-2 py-1 text-[11px] font-bold text-slate-300 hover:bg-white/10"
+          >
+            Ubah
+          </button>
+          <button
+            onClick={onDelete}
+            className="rounded-lg border border-masdora-alert/40 px-2 py-1 text-[11px] font-bold text-red-300 hover:bg-masdora-alert/15"
+          >
+            Padam
+          </button>
         </div>
       )}
     </div>
