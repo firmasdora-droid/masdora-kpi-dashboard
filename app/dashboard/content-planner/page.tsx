@@ -72,6 +72,38 @@ function warnaStatus(status: string): string {
   return STATUS_COLOR[status] ?? "#8FA3B8";
 }
 
+/**
+ * Keutamaan status bagi mewarnakan SATU petak hari.
+ *
+ * Satu hari boleh ada beberapa konten dengan status berbeza. Warna petak
+ * mengambil status yang paling perlu perhatian, supaya hari bermasalah
+ * tidak tersembunyi di bawah warna hijau "sudah siap".
+ *
+ * Nombor lebih kecil = lebih penting.
+ */
+const STATUS_KEUTAMAAN: Record<string, number> = {
+  tangguh: 0, // merah — ada masalah
+  dirancang: 1, // kelabu — belum mula
+  "sedang buat": 2, // kuning — dalam proses
+  sedia: 3, // oren — siap, menunggu masa siar
+  disiarkan: 4, // hijau — selesai
+};
+
+/** Status yang mewakili satu hari + adakah hari itu bercampur status. */
+function statusPetak(items: ContentPlan[]): {
+  status: string;
+  bercampur: boolean;
+} | null {
+  if (items.length === 0) return null;
+  const unik = new Set(items.map((x) => x.status));
+  const utama = items
+    .map((x) => x.status)
+    .sort(
+      (a, b) => (STATUS_KEUTAMAAN[a] ?? 9) - (STATUS_KEUTAMAAN[b] ?? 9)
+    )[0];
+  return { status: utama, bercampur: unik.size > 1 };
+}
+
 const HARI = ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"];
 
 /** Kepala kalendar — minggu bermula hari Isnin (kebiasaan tempat kerja). */
@@ -575,6 +607,18 @@ export default function ContentPlannerPage() {
               const dipilih = pilihHari === iso;
               const hujungMinggu = i % 7 >= 5;
 
+              const sp = statusPetak(items);
+              const warna = sp ? warnaStatus(sp.status) : null;
+
+              // Petak yang ADA konten mengambil warna status keseluruhan.
+              // Petak kosong kekal seperti biasa.
+              const gaya: React.CSSProperties = warna
+                ? {
+                    background: `${warna}24`,
+                    borderColor: `${warna}80`,
+                  }
+                : {};
+
               return (
                 <button
                   key={iso}
@@ -582,14 +626,26 @@ export default function ContentPlannerPage() {
                     setPilihHari(dipilih ? null : iso);
                     setDraft((d) => ({ ...d, post_date: iso }));
                   }}
-                  className={`min-h-[124px] rounded-lg border p-2 text-left align-top transition ${
-                    dipilih
-                      ? "border-masdora-orange/70 bg-masdora-orange/10"
-                      : hariIni
-                      ? "border-masdora-orange/40 bg-white/[0.05]"
+                  style={gaya}
+                  title={
+                    sp
+                      ? `${items.length} konten · ${
+                          sp.bercampur ? "status bercampur, utama: " : ""
+                        }${sp.status}`
+                      : undefined
+                  }
+                  className={`min-h-[124px] rounded-lg border p-2 text-left align-top transition hover:brightness-125 ${
+                    warna
+                      ? ""
                       : hujungMinggu
-                      ? "border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04]"
-                      : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                      ? "border-white/[0.06] bg-white/[0.01]"
+                      : "border-white/10 bg-white/[0.03]"
+                  } ${
+                    dipilih
+                      ? "ring-2 ring-white/60"
+                      : hariIni
+                      ? "ring-1 ring-masdora-orange/50"
+                      : ""
                   }`}
                 >
                   <div className="mb-1.5 flex items-center justify-between">
@@ -616,9 +672,12 @@ export default function ContentPlannerPage() {
                         className="rounded border-l-[3px] px-1.5 py-1"
                         style={{
                           borderLeftColor: warnaStatus(plan.status),
-                          // Latar warna status yang lembut supaya teks kekal
-                          // mudah dibaca atas tema gelap.
-                          background: `${warnaStatus(plan.status)}26`,
+                          // Latar gelap lut sinar: petak sudah berwarna
+                          // status, jadi kotak dalam perlu kontras supaya
+                          // teks kekal mudah dibaca. Jalur kiri tetap
+                          // membawa warna status konten itu sendiri, jadi
+                          // hari yang bercampur status masih jelas.
+                          background: "rgba(8, 14, 20, 0.45)",
                         }}
                         title={`${masaCantik(plan.post_time)} · ${plan.title} · ${
                           plan.account
@@ -655,6 +714,19 @@ export default function ContentPlannerPage() {
                       </p>
                     )}
                   </div>
+
+                  {/* Label status petak — supaya warna tidak perlu dihafal */}
+                  {sp && (
+                    <p
+                      className="mt-1.5 truncate text-[9px] font-bold uppercase tracking-wide"
+                      style={{ color: warna ?? undefined }}
+                    >
+                      {sp.status}
+                      {sp.bercampur && (
+                        <span className="text-slate-400"> +campur</span>
+                      )}
+                    </p>
+                  )}
                 </button>
               );
             })}
