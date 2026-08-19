@@ -55,6 +55,23 @@ const STATUS_PILL: Record<string, string> = {
   tangguh: "pill-merah",
 };
 
+/**
+ * Warna kotak konten dalam kalendar — mengikut STATUS, supaya sekali pandang
+ * kelihatan mana yang belum mula, sedang dibuat, sedia, sudah disiarkan
+ * atau tertangguh.
+ */
+const STATUS_COLOR: Record<string, string> = {
+  dirancang: "#8FA3B8", // kelabu — belum mula
+  "sedang buat": "#C9A227", // kuning — dalam proses
+  sedia: "#F26122", // oren — siap, menunggu masa siar
+  disiarkan: "#6B8042", // hijau — selesai
+  tangguh: "#D9432A", // merah — bermasalah
+};
+
+function warnaStatus(status: string): string {
+  return STATUS_COLOR[status] ?? "#8FA3B8";
+}
+
 const HARI = ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"];
 
 /** Kepala kalendar — minggu bermula hari Isnin (kebiasaan tempat kerja). */
@@ -129,6 +146,7 @@ export default function ContentPlannerPage() {
 
   const [ownerFilter, setOwnerFilter] = useState("");
   const [accountFilter, setAccountFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [paparan, setPaparan] = useState<"kalendar" | "senarai">("kalendar");
   /** Hari yang dipilih dalam kalendar — panel butiran dipapar di bawahnya. */
   const [pilihHari, setPilihHari] = useState<string | null>(null);
@@ -203,9 +221,10 @@ export default function ContentPlannerPage() {
       plans.filter((x) => {
         if (ownerFilter && x.user_id !== ownerFilter) return false;
         if (accountFilter && x.account !== accountFilter) return false;
+        if (statusFilter && x.status !== statusFilter) return false;
         return true;
       }),
-    [plans, ownerFilter, accountFilter]
+    [plans, ownerFilter, accountFilter, statusFilter]
   );
 
   /** Kumpulkan mengikut tarikh supaya jadual mudah dibaca. */
@@ -232,11 +251,19 @@ export default function ContentPlannerPage() {
 
   const petak = useMemo(() => binaPetak(ym.year, ym.month), [ym]);
 
+  // Kiraan petunjuk dikira daripada SEMUA rancangan bulan itu, bukan yang
+  // sudah ditapis — supaya angka tidak jadi sifar sebaik tapisan digunakan.
   const perAccount = useMemo(() => {
     const m = new Map<string, number>();
-    filtered.forEach((x) => m.set(x.account, (m.get(x.account) ?? 0) + 1));
+    plans.forEach((x) => m.set(x.account, (m.get(x.account) ?? 0) + 1));
     return m;
-  }, [filtered]);
+  }, [plans]);
+
+  const perStatus = useMemo(() => {
+    const m = new Map<string, number>();
+    plans.forEach((x) => m.set(x.status, (m.get(x.status) ?? 0) + 1));
+    return m;
+  }, [plans]);
 
   function bolehUbah(plan: ContentPlan): boolean {
     return isManagerRole || plan.user_id === me?.id;
@@ -586,20 +613,37 @@ export default function ContentPlannerPage() {
                     {items.slice(0, 3).map((plan) => (
                       <div
                         key={plan.id}
-                        className="rounded border-l-[3px] bg-white/[0.07] px-1.5 py-1"
+                        className="rounded border-l-[3px] px-1.5 py-1"
                         style={{
-                          borderLeftColor:
-                            ACCOUNT_COLOR[plan.account] ?? "#8FA3B8",
+                          borderLeftColor: warnaStatus(plan.status),
+                          // Latar warna status yang lembut supaya teks kekal
+                          // mudah dibaca atas tema gelap.
+                          background: `${warnaStatus(plan.status)}26`,
                         }}
                         title={`${masaCantik(plan.post_time)} · ${plan.title} · ${
                           plan.account
-                        } · ${nameById.get(plan.user_id) ?? "-"}`}
+                        } · ${plan.status} · ${
+                          nameById.get(plan.user_id) ?? "-"
+                        }`}
                       >
-                        {plan.post_time && (
-                          <p className="text-[10px] font-bold leading-tight text-masdora-orange">
-                            {plan.post_time.slice(0, 5)}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {plan.post_time && (
+                            <span
+                              className="text-[10px] font-bold leading-tight"
+                              style={{ color: warnaStatus(plan.status) }}
+                            >
+                              {plan.post_time.slice(0, 5)}
+                            </span>
+                          )}
+                          {/* Titik kecil = akaun, supaya maklumat itu tidak hilang */}
+                          <span
+                            className="ml-auto h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                            style={{
+                              background:
+                                ACCOUNT_COLOR[plan.account] ?? "#8FA3B8",
+                            }}
+                          />
+                        </div>
                         <p className="truncate text-[11px] font-semibold leading-tight text-slate-100">
                           {plan.title}
                         </p>
@@ -616,31 +660,66 @@ export default function ContentPlannerPage() {
             })}
           </div>
 
-          {/* Petunjuk warna akaun — juga berfungsi sebagai tapisan & kiraan */}
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
-            {CONTENT_ACCOUNTS.map((a) => (
-              <button
-                key={a}
-                onClick={() => setAccountFilter(accountFilter === a ? "" : a)}
-                className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 transition ${
-                  accountFilter === a
-                    ? "border-masdora-orange/60 bg-masdora-orange/10"
-                    : "border-white/10 hover:bg-white/5"
-                }`}
-              >
-                <span
-                  className="h-2.5 w-2.5 rounded-sm"
-                  style={{ background: ACCOUNT_COLOR[a] }}
-                />
-                <span className="text-[10px] font-bold text-slate-300">{a}</span>
-                <span className="text-[10px] font-black text-white">
-                  {perAccount.get(a) ?? 0}
-                </span>
-              </button>
-            ))}
-            <span className="ml-auto text-[10px] text-slate-500">
-              Klik hari untuk lihat butiran &amp; isi tarikh borang
-            </span>
+          {/* ---- Petunjuk: WARNA = STATUS ---- */}
+          <div className="mt-4 border-t border-white/10 pt-3">
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Warna = Status
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {CONTENT_PLAN_STATUSES.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(statusFilter === s ? "" : s)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 transition ${
+                    statusFilter === s
+                      ? "border-white/40 bg-white/10"
+                      : "border-white/10 hover:bg-white/5"
+                  }`}
+                >
+                  <span
+                    className="h-3 w-3 rounded-sm"
+                    style={{ background: STATUS_COLOR[s] }}
+                  />
+                  <span className="text-[11px] font-bold capitalize text-slate-200">
+                    {s}
+                  </span>
+                  <span className="text-[11px] font-black text-white">
+                    {perStatus.get(s) ?? 0}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <p className="mb-1.5 mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Titik kecil = Akaun
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {CONTENT_ACCOUNTS.map((a) => (
+                <button
+                  key={a}
+                  onClick={() => setAccountFilter(accountFilter === a ? "" : a)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 transition ${
+                    accountFilter === a
+                      ? "border-masdora-orange/60 bg-masdora-orange/10"
+                      : "border-white/10 hover:bg-white/5"
+                  }`}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ background: ACCOUNT_COLOR[a] }}
+                  />
+                  <span className="text-[10px] font-bold text-slate-300">
+                    {a}
+                  </span>
+                  <span className="text-[10px] font-black text-white">
+                    {perAccount.get(a) ?? 0}
+                  </span>
+                </button>
+              ))}
+              <span className="ml-auto text-[10px] text-slate-500">
+                Klik hari untuk lihat butiran &amp; isi tarikh borang
+              </span>
+            </div>
           </div>
         </motion.div>
       )}
@@ -745,9 +824,10 @@ function BarisRancangan({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      {/* Jalur warna = status (sama seperti dalam kalendar) */}
       <span
-        className="h-8 w-1 flex-shrink-0 rounded-full"
-        style={{ background: ACCOUNT_COLOR[plan.account] ?? "#8FA3B8" }}
+        className="h-8 w-1.5 flex-shrink-0 rounded-full"
+        style={{ background: warnaStatus(plan.status) }}
       />
       <span className="w-20 flex-shrink-0 text-xs font-bold text-masdora-orange">
         {masaCantik(plan.post_time)}
