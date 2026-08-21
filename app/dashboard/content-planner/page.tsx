@@ -182,6 +182,8 @@ export default function ContentPlannerPage() {
   const [paparan, setPaparan] = useState<"kalendar" | "senarai">("kalendar");
   /** Hari yang dipilih dalam kalendar — panel butiran dipapar di bawahnya. */
   const [pilihHari, setPilihHari] = useState<string | null>(null);
+  /** Konten yang menunggu pengesahan padam. */
+  const [padamSasaran, setPadamSasaran] = useState<ContentPlan | null>(null);
 
   const isManagerRole = me?.role === "manager" || me?.role === "ceo";
 
@@ -619,12 +621,25 @@ export default function ContentPlannerPage() {
                   }
                 : {};
 
+              const pilihHariIni = () => {
+                setPilihHari(dipilih ? null : iso);
+                setDraft((d) => ({ ...d, post_date: iso }));
+              };
+
               return (
-                <button
+                // Petak ialah <div> dan bukan <button>, kerana setiap konten
+                // di dalamnya ada butang Ubah & Padam sendiri — butang tidak
+                // boleh bersarang dalam butang.
+                <div
                   key={iso}
-                  onClick={() => {
-                    setPilihHari(dipilih ? null : iso);
-                    setDraft((d) => ({ ...d, post_date: iso }));
+                  role="button"
+                  tabIndex={0}
+                  onClick={pilihHariIni}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      pilihHariIni();
+                    }
                   }}
                   style={gaya}
                   title={
@@ -634,7 +649,7 @@ export default function ContentPlannerPage() {
                         }${sp.status}`
                       : undefined
                   }
-                  className={`min-h-[124px] rounded-lg border p-2 text-left align-top transition hover:brightness-125 ${
+                  className={`min-h-[124px] cursor-pointer rounded-lg border p-2 text-left align-top transition hover:brightness-125 ${
                     warna
                       ? ""
                       : hujungMinggu
@@ -669,7 +684,7 @@ export default function ContentPlannerPage() {
                     {items.slice(0, 3).map((plan) => (
                       <div
                         key={plan.id}
-                        className="rounded border-l-[3px] px-1.5 py-1"
+                        className="group/kotak relative rounded border-l-[3px] px-1.5 py-1"
                         style={{
                           borderLeftColor: warnaStatus(plan.status),
                           // Latar gelap lut sinar: petak sudah berwarna
@@ -706,6 +721,34 @@ export default function ContentPlannerPage() {
                         <p className="truncate text-[11px] font-semibold leading-tight text-slate-100">
                           {plan.title}
                         </p>
+
+                        {/* Ubah & Padam terus dari kalendar.
+                            stopPropagation supaya klik butang tidak
+                            tersalah dianggap klik pada petak hari. */}
+                        {bolehUbah(plan) && (
+                          <div className="absolute right-0.5 top-0.5 hidden gap-0.5 rounded bg-black/70 p-0.5 group-hover/kotak:flex">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                mulaEdit(plan);
+                              }}
+                              title="Ubah konten ini"
+                              className="rounded px-1 text-[10px] font-bold text-slate-200 hover:bg-white/20"
+                            >
+                              ✎
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPadamSasaran(plan);
+                              }}
+                              title="Padam konten ini"
+                              className="rounded px-1 text-[10px] font-bold text-red-300 hover:bg-red-500/30"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                     {items.length > 3 && (
@@ -727,7 +770,7 @@ export default function ContentPlannerPage() {
                       )}
                     </p>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -822,7 +865,7 @@ export default function ContentPlannerPage() {
                   nama={nameById.get(plan.user_id) ?? "-"}
                   bolehUbah={bolehUbah(plan)}
                   onEdit={() => mulaEdit(plan)}
-                  onDelete={() => handleDelete(plan)}
+                  onDelete={() => setPadamSasaran(plan)}
                 />
               ))}
             </div>
@@ -868,7 +911,7 @@ export default function ContentPlannerPage() {
                     nama={nameById.get(plan.user_id) ?? "-"}
                     bolehUbah={bolehUbah(plan)}
                     onEdit={() => mulaEdit(plan)}
-                    onDelete={() => handleDelete(plan)}
+                    onDelete={() => setPadamSasaran(plan)}
                   />
                 ))}
               </div>
@@ -876,6 +919,57 @@ export default function ContentPlannerPage() {
           ))}
         </div>
         ))}
+
+      {/* ---------- Pengesahan padam ---------- */}
+      {padamSasaran && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/70"
+            onClick={() => setPadamSasaran(null)}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+            className="relative z-10 w-full max-w-sm rounded-2xl border border-masdora-alert/45 bg-navy-soft p-6"
+          >
+            <p className="font-bold text-white">Padam konten ini?</p>
+
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+              <p className="text-sm font-semibold text-slate-100">
+                {padamSasaran.title}
+              </p>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                {tarikhCantik(padamSasaran.post_date)} ·{" "}
+                {masaCantik(padamSasaran.post_time)} · {padamSasaran.account}
+              </p>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-400">
+              Rekod ini akan dibuang terus dan tidak boleh dikembalikan.
+            </p>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="btn-secondary"
+                onClick={() => setPadamSasaran(null)}
+              >
+                Batal
+              </button>
+              <button
+                className="rounded-xl bg-masdora-alert px-4 py-2 text-sm font-bold text-white transition hover:brightness-110"
+                onClick={() => {
+                  const sasaran = padamSasaran;
+                  setPadamSasaran(null);
+                  handleDelete(sasaran);
+                }}
+              >
+                Ya, Padam
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
