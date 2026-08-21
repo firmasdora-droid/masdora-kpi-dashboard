@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
+import SalesPodium, { type PodiumItem } from "@/components/charts/SalesPodium";
 import type { Profile } from "@/types/database";
 
 interface ContentPost {
@@ -174,6 +175,49 @@ export default function PrestasiKontenPage() {
   );
   const topPosts = useMemo(() => sortedAll.slice(0, 5), [sortedAll]);
 
+  /** Leaderboard akaun — untuk podium beranimasi. */
+  const podiumAkaun = useMemo<PodiumItem[]>(
+    () =>
+      perAccount
+        .filter((a) => a.views > 0)
+        .map((a, i) => ({
+          id: a.account,
+          rank: i + 1,
+          name: a.account,
+          deptCode: `${a.posts} video`,
+          value: a.views,
+          valueLabel: nf(a.views),
+        })),
+    [perAccount]
+  );
+
+  /**
+   * Konten paling BERKESAN = kadar engagement tertinggi
+   * (like + komen + share) / tontonan.
+   *
+   * Video bertontonan sangat rendah dibuang dahulu. Tanpa had ini, satu video
+   * 5 tontonan dengan 1 like akan menunjukkan 20% dan mengalahkan video
+   * 10,000 tontonan dengan 300 interaksi (3%) — padahal video kedua jauh
+   * lebih berkesan. Had ditetapkan pada 10% purata tontonan (minimum 50)
+   * dan dipaparkan kepada pengguna supaya telus.
+   */
+  const hadTontonan = useMemo(
+    () => Math.max(50, Math.round(avgViews * 0.1)),
+    [avgViews]
+  );
+
+  const topBerkesan = useMemo(() => {
+    const layak = filtered
+      .filter((p) => p.views >= hadTontonan)
+      .map((p) => {
+        const interaksi = p.likes + p.comments + p.shares;
+        return { post: p, interaksi, kadar: (interaksi / p.views) * 100 };
+      })
+      .filter((x) => x.interaksi > 0)
+      .sort((a, b) => b.kadar - a.kadar);
+    return layak.slice(0, 5);
+  }, [filtered, hadTontonan]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -335,6 +379,26 @@ export default function PrestasiKontenPage() {
         </motion.div>
       ) : (
         <>
+          {/* ---------- Leaderboard Akaun (podium) ---------- */}
+          {podiumAkaun.length > 0 && (
+            <motion.div {...cardMotion} className="card">
+              <div className="mb-2">
+                <h3 className="font-semibold text-white">
+                  🏆 Leaderboard Akaun
+                </h3>
+                <p className="text-xs text-muted">
+                  Akaun paling tinggi jumlah tontonan
+                  {monthFilter ? ` bagi ${monthFilter}` : ""}.
+                </p>
+              </div>
+              <SalesPodium
+                items={podiumAkaun}
+                bare
+                emptyMessage="Tiada tontonan direkod untuk tapisan ini."
+              />
+            </motion.div>
+          )}
+
           {perAccount.length > 1 && (
             <motion.div {...cardMotion} className="card">
               <h3 className="mb-4 font-semibold text-white">
@@ -370,7 +434,14 @@ export default function PrestasiKontenPage() {
 
           {topPosts.some((p) => p.views > 0) && (
             <motion.div {...cardMotion} className="card">
-              <h3 className="mb-3 font-semibold text-white">Video Terbaik</h3>
+              <div className="mb-3">
+                <h3 className="font-semibold text-white">
+                  🥇 Leaderboard Konten — Tontonan Tertinggi
+                </h3>
+                <p className="text-xs text-muted">
+                  Video yang paling banyak ditonton.
+                </p>
+              </div>
               <div className="space-y-2">
                 {topPosts.map((p, i) => (
                   <div
@@ -406,6 +477,101 @@ export default function PrestasiKontenPage() {
               </div>
             </motion.div>
           )}
+
+          {/* ---------- Leaderboard Konten Paling Berkesan ---------- */}
+          <motion.div {...cardMotion} className="card">
+            <div className="mb-3">
+              <h3 className="font-semibold text-white">
+                ⚡ Leaderboard Konten — Paling Berkesan
+              </h3>
+              <p className="text-xs text-muted">
+                Bukan yang paling banyak tontonan, tetapi yang paling banyak
+                penonton bertindak (like + komen + share berbanding tontonan).
+              </p>
+            </div>
+
+            {topBerkesan.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-white/15 p-3 text-center text-xs text-muted">
+                Belum cukup data. Video perlu sekurang-kurangnya{" "}
+                {nf(hadTontonan)} tontonan dan ada interaksi untuk dikira.
+              </p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {topBerkesan.map((x, i) => (
+                    <div
+                      key={`${x.post.monthTab}-${x.post.rowIndex}`}
+                      className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                    >
+                      <span
+                        className={`w-5 text-center text-sm font-bold ${
+                          i === 0 ? "text-masdora-orange" : "text-slate-500"
+                        }`}
+                      >
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-100">
+                          {x.post.contentType || "(tiada tajuk)"}
+                        </p>
+                        <p className="truncate text-[11px] text-slate-500">
+                          {x.post.account} · {nf(x.post.views)} tontonan ·{" "}
+                          {nf(x.interaksi)} interaksi
+                        </p>
+                        <div className="mt-1.5 h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-white/10">
+                          <motion.div
+                            className="h-full rounded-full bg-gradient-to-r from-masdora-olive to-masdora-olive/60"
+                            initial={{ width: 0 }}
+                            animate={{
+                              width: `${Math.min(
+                                100,
+                                (x.kadar / (topBerkesan[0]?.kadar || 1)) * 100
+                              )}%`,
+                            }}
+                            transition={{
+                              duration: 0.7,
+                              delay: i * 0.08,
+                              ease: "easeOut",
+                            }}
+                          />
+                        </div>
+                      </div>
+                      {x.post.videoLink && (
+                        <a
+                          href={x.post.videoLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-shrink-0 text-xs font-semibold text-brand-400 hover:underline"
+                        >
+                          Buka ↗
+                        </a>
+                      )}
+                      <span className="flex-shrink-0 text-right">
+                        <span className="block text-sm font-black text-masdora-olive">
+                          {x.kadar.toFixed(2)}%
+                        </span>
+                        <span className="block text-[10px] text-slate-500">
+                          engagement
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 border-t border-white/5 pt-2 text-[11px] text-slate-500">
+                  Hanya video dengan sekurang-kurangnya{" "}
+                  <strong className="text-slate-400">
+                    {nf(hadTontonan)} tontonan
+                  </strong>{" "}
+                  dikira, supaya video bertontonan sangat rendah tidak menang
+                  hanya kerana ada satu like. Purata keseluruhan:{" "}
+                  <strong className="text-slate-400">
+                    {engagementRate.toFixed(2)}%
+                  </strong>
+                  .
+                </p>
+              </>
+            )}
+          </motion.div>
 
           {/* Senarai penuh disorok — buka hanya bila perlu */}
           <div>
