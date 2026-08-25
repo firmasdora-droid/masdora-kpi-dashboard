@@ -113,6 +113,31 @@ export default function RecoveryPage() {
     .filter((r) => tierOf(r.status) === "pulih")
     .reduce((s, r) => s + Number(r.amount_rm ?? 0), 0);
 
+  /**
+   * Bila kali terakhir CRM menghantar data ke sini.
+   *
+   * Tanpa ini, halaman kosong bermakna dua perkara yang sangat berbeza —
+   * "belum ada customer untuk dihubungi" atau "saluran data rosak" — dan
+   * tiada cara untuk membezakannya.
+   */
+  const lastSync = useMemo(() => {
+    if (records.length === 0) return null;
+    const terkini = records
+      .map((r) => r.updated_at)
+      .filter(Boolean)
+      .sort()
+      .at(-1);
+    if (!terkini) return null;
+    const d = new Date(terkini);
+    if (Number.isNaN(d.getTime())) return null;
+    const jamLalu = (Date.now() - d.getTime()) / 3_600_000;
+    return {
+      teks: d.toLocaleString("ms-MY"),
+      basi: jamLalu > 48,
+      jamLalu: Math.round(jamLalu),
+    };
+  }, [records]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -143,6 +168,51 @@ export default function RecoveryPage() {
           className="card border-red-500/30 text-sm text-red-300"
         >
           {error}
+        </motion.div>
+      )}
+
+      {/* Keadaan saluran data — supaya "kosong" tidak mengelirukan */}
+      {!loading && !error && (
+        <motion.div
+          {...cardMotion}
+          className={`card text-sm ${
+            records.length === 0
+              ? "border-masdora-alert/40"
+              : lastSync?.basi
+              ? "border-masdora-yellow/40"
+              : ""
+          }`}
+        >
+          {records.length === 0 ? (
+            <>
+              <p className="font-bold text-red-200">
+                Sistem CRM belum pernah menghantar data ke dashboard
+              </p>
+              <p className="mt-1 text-xs text-slate-300">
+                Halaman ini kosong bukan kerana tiada customer — tetapi kerana
+                saluran automatik antara CRM dan dashboard belum disambung.
+                Dashboard sudah sedia menerima; CRM perlu diprogramkan untuk
+                menghantar. Rujuk fail{" "}
+                <span className="font-mono text-slate-200">
+                  PANDUAN-SAMBUNG-CRM.md
+                </span>{" "}
+                dalam projek.
+              </p>
+            </>
+          ) : lastSync ? (
+            <p className={lastSync.basi ? "text-amber-200" : "text-slate-400"}>
+              {lastSync.basi ? "⚠️ " : "✓ "}
+              Data terakhir diterima dari CRM:{" "}
+              <strong className="text-white">{lastSync.teks}</strong>
+              {lastSync.basi && (
+                <span>
+                  {" "}
+                  — sudah {lastSync.jamLalu} jam. Sila semak sama ada CRM masih
+                  menghantar.
+                </span>
+              )}
+            </p>
+          ) : null}
         </motion.div>
       )}
 
