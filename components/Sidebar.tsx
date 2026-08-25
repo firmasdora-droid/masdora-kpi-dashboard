@@ -149,7 +149,10 @@ export default function Sidebar({
           href: "https://masdora.zo.space/team/recovery-crm",
           label: "Buka Sistem CRM",
           icon: "🔗",
-          show: isMaisarah,
+          // Maisarah yang menguruskan recovery, tetapi Marketing Manager & CEO
+          // juga perlu boleh masuk sistem CRM itu untuk memantau. Sama dengan
+          // kebenaran halaman "Recovery CRM" di atas.
+          show: isMaisarah || manager || role === "ceo",
           external: true,
         },
       ],
