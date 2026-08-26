@@ -110,17 +110,23 @@ export async function GET(request: Request) {
     }
   }
 
-  let html: string;
+  let hasil;
   try {
-    html = await ambilHalamanCrm(process.env.CRM_TEAM_PASSWORD);
+    hasil = await ambilHalamanCrm(process.env.CRM_TEAM_PASSWORD);
   } catch (e) {
     return Response.json(
-      { ok: false, error: e instanceof Error ? e.message : "Gagal menghubungi CRM." },
+      {
+        ok: false,
+        error:
+          e instanceof Error ? e.message : "Gagal menghubungi CRM.",
+      },
       { status: 502 }
     );
   }
 
-  // Mod pemeriksaan — untuk menyelaraskan pembaca bila lajur CRM berubah.
+  // Mod pemeriksaan dijalankan SEBELUM semakan log masuk, supaya ia masih
+  // berguna justeru bila log masuk gagal — itulah masanya kita paling
+  // perlukan jejaknya.
   if (debug) {
     if (!auth.manager) {
       return Response.json(
@@ -128,8 +134,27 @@ export async function GET(request: Request) {
         { status: 403 }
       );
     }
-    return Response.json({ ok: true, debug: periksaStruktur(html) });
+    return Response.json({
+      ok: true,
+      logMasukBerjaya: hasil.berjaya,
+      jejak: hasil.jejak,
+      struktur: periksaStruktur(hasil.html),
+    });
   }
+
+  if (!hasil.berjaya) {
+    return Response.json(
+      {
+        ok: false,
+        error:
+          "Kata laluan CRM ditolak, atau CRM tidak memberikan sesi. Buka /api/crm-sync?debug=1 untuk melihat puncanya.",
+        jejak: hasil.jejak,
+      },
+      { status: 401 }
+    );
+  }
+
+  const html = hasil.html;
 
   const rekod = bacaRekod(html);
 
@@ -138,8 +163,9 @@ export async function GET(request: Request) {
       {
         ok: false,
         error:
-          "Berjaya log masuk ke CRM, tetapi tiada baris data dikenali. Struktur jadual mungkin berbeza daripada jangkaan.",
+          "Berjaya log masuk ke CRM, tetapi tiada baris data dikenali. Buka /api/crm-sync?debug=1 dan hantar hasilnya untuk melaraskan pembaca.",
         petunjuk: periksaStruktur(html),
+        jejak: hasil.jejak,
       },
       { status: 422 }
     );

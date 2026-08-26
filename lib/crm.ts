@@ -37,6 +37,8 @@ export interface CrmDebug {
   tableCount: number;
   /** Adakah data berbentuk JSON terbenam dan bukan jadual. */
   jsonEmbedded: boolean;
+  /** Cebisan JSON pertama yang dijumpai, kalau data bukan dalam jadual. */
+  jsonCebisan: string | null;
   /** 3 baris pertama, mentah — untuk menyelaraskan pembaca. */
   sample: string[][];
 }
@@ -111,33 +113,130 @@ function tarikh(s: string): string | null {
  * Log masuk ke CRM dan pulangkan HTML dashboard.
  * Melontar ralat dengan mesej yang boleh difahami kalau gagal.
  */
-export async function ambilHalamanCrm(kataLaluan: string): Promise<string> {
-  const res = await fetch(CRM_URL, {
+/** Jejak apa yang berlaku semasa log masuk — untuk mod pemeriksaan. */
+export interface JejakLogMasuk {
+  statusPost: number;
+  adaCookie: boolean;
+  ikutPengalihan: string | null;
+  statusAkhir: number;
+  panjangHtml: number;
+  masihBorangLogMasuk: boolean;
+  /** Cebisan teks halaman, untuk melihat apa yang sebenarnya dibalas. */
+  cebisan: string;
+}
+
+export interface HasilCrm {
+  html: string;
+  jejak: JejakLogMasuk;
+  berjaya: boolean;
+}
+
+/** Ambil semua nilai Set-Cookie dan gabungkan menjadi satu header Cookie. */
+function kutipCookie(res: Response): string {
+  const h = res.headers as Headers & { getSetCookie?: () => string[] };
+  const senarai =
+    typeof h.getSetCookie === "function"
+      ? h.getSetCookie()
+      : [res.headers.get("set-cookie") ?? ""].filter(Boolean);
+
+  return senarai
+    .map((c) => c.split(";")[0].trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
+/** Adakah HTML ini masih halaman log masuk? */
+function borangLogMasuk(html: string): boolean {
+  return /<input[^>]*name=["']?pw["']?/i.test(html);
+}
+
+/**
+ * Log masuk ke CRM dan pulangkan HTML dashboard.
+ *
+ * CRM menetapkan cookie sesi selepas kata laluan diterima. `fetch` di
+ * pelayan TIDAK menyimpan cookie secara automatik, jadi kalau kita biarkan
+ * ia mengikut pengalihan, permintaan kedua pergi tanpa cookie dan CRM
+ * memulangkan borang log masuk semula — nampak seperti kata laluan salah
+ * sedangkan ia betul. Sebab itu pengalihan dikendalikan secara manual di
+ * sini, dengan cookie dibawa bersama.
+ */
+export async function ambilHalamanCrm(kataLaluan: string): Promise<HasilCrm> {
+  const kepala = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "User-Agent":
+      "Mozilla/5.0 (compatible; MasdoraDashboard/1.0; +https://masdora-kpi-dashboard.vercel.app)",
+    Accept: "text/html,application/xhtml+xml",
+  };
+
+  const post = await fetch(CRM_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      // Sesetengah hos menolak permintaan tanpa User-Agent
-      "User-Agent": "MasdoraDashboard/1.0",
-    },
+    headers: kepala,
     body: new URLSearchParams({ pw: kataLaluan }).toString(),
-    redirect: "follow",
+    redirect: "manual", // jangan ikut sendiri — cookie perlu dibawa
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    throw new Error(`CRM membalas HTTP ${res.status}.`);
+  const cookie = kutipCookie(post);
+  const lokasi = post.headers.get("location");
+
+  let html = "";
+  let statusAkhir = post.status;
+
+  // 3xx: ikut pengalihan sambil membawa cookie sesi.
+  if (post.status >= 300 && post.status < 400) {
+    const url = lokasi
+      ? new URL(lokasi, CRM_URL).toString()
+      : CRM_URL;
+    const ikut = await fetch(url, {
+      headers: { ...kepala, Cookie: cookie },
+      cache: "no-store",
+    });
+    statusAkhir = ikut.status;
+    html = await ikut.text();
+  } else {
+    html = await post.text();
+
+    // Ada laman membalas 200 dengan borang log masuk semula walaupun
+    // kata laluan betul, dan hanya memberi data pada permintaan GET
+    // berikutnya. Kalau ada cookie, cuba sekali lagi dengannya.
+    if (cookie && borangLogMasuk(html)) {
+      const semula = await fetch(CRM_URL, {
+        headers: { ...kepala, Cookie: cookie },
+        cache: "no-store",
+      });
+      statusAkhir = semula.status;
+      html = await semula.text();
+    }
   }
 
-  const html = await res.text();
+  const masihBorang = borangLogMasuk(html);
 
-  // Kalau borang kata laluan masih ada, log masuk gagal.
-  if (/name="pw"/i.test(html) && !/<table/i.test(html)) {
-    throw new Error(
-      "Kata laluan CRM ditolak. Semak nilai CRM_TEAM_PASSWORD di Vercel."
-    );
-  }
+  // CRM membalas 401 khusus untuk kata laluan salah (disahkan dengan
+  // menghantar kata laluan palsu). Jadi status itu — bukan kehadiran borang
+  // — yang menentukan sama ada log masuk ditolak. Halaman yang sudah log
+  // masuk mungkin masih mengandungi medan `pw` (contohnya borang tukar kata
+  // laluan), dan menganggapnya sebagai penolakan adalah silap.
+  const ditolak = post.status === 401 || post.status === 403;
 
-  return html;
+  return {
+    html,
+    berjaya: !ditolak,
+    jejak: {
+      statusPost: post.status,
+      adaCookie: cookie.length > 0,
+      ikutPengalihan: lokasi,
+      statusAkhir,
+      panjangHtml: html.length,
+      masihBorangLogMasuk: masihBorang,
+      cebisan: html
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 600),
+    },
+  };
 }
 
 /** Periksa struktur halaman tanpa menyimpan apa-apa. */
@@ -145,11 +244,26 @@ export function periksaStruktur(html: string): CrmDebug {
   const tables = html.match(/<table[\s\S]*?<\/table>/gi) ?? [];
   const t = jadualTerbesar(html);
   const rows = t ? baris(t) : [];
+
+  // Kalau data bukan dalam jadual, ia selalunya JSON terbenam dalam
+  // <script>. Kutip calon pertama supaya pembaca boleh dilaraskan.
+  let jsonCebisan: string | null = null;
+  const skrip = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) ?? [];
+  for (const s of skrip) {
+    const isi = s.replace(/<\/?script[^>]*>/gi, "");
+    const arr = isi.match(/\[\s*\{[\s\S]{40,}?\}\s*\]/);
+    if (arr) {
+      jsonCebisan = arr[0].slice(0, 800);
+      break;
+    }
+  }
+
   return {
     headers: rows[0] ?? [],
     rowCount: Math.max(0, rows.length - 1),
     tableCount: tables.length,
-    jsonEmbedded: /application\/json|__DATA__|window\.__/.test(html),
+    jsonEmbedded: jsonCebisan !== null,
+    jsonCebisan,
     sample: rows.slice(1, 4),
   };
 }
