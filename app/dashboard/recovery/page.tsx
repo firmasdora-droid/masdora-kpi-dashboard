@@ -67,6 +67,7 @@ interface DiagnosisCrm {
     jsonCebisan: string | null;
     statusCebisan?: string[];
     endpoints?: string[];
+    panggilanStatus?: string[];
     sample: string[][];
   };
   error?: string;
@@ -494,6 +495,24 @@ export default function RecoveryPage() {
                           {b.cebisan || "(kosong)"}
                         </p>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(diagnosis.struktur?.panggilanStatus?.length ?? 0) > 0 && (
+                <div>
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-masdora-orange">
+                    Cara CRM memanggil endpoint status
+                  </p>
+                  <div className="max-h-60 space-y-1.5 overflow-auto">
+                    {diagnosis.struktur!.panggilanStatus!.map((c, i) => (
+                      <p
+                        key={i}
+                        className="rounded border border-masdora-orange/30 bg-black/40 p-2 font-mono text-[10px] leading-relaxed text-amber-100"
+                      >
+                        {c}
+                      </p>
                     ))}
                   </div>
                 </div>

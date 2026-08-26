@@ -64,6 +64,11 @@ export interface CrmDebug {
    * endpoint berasingan, ia akan kelihatan di sini.
    */
   endpoints: string[];
+  /**
+   * Kod di sekeliling panggilan ke endpoint status — menunjukkan kaedah,
+   * header dan bentuk badan yang digunakan oleh CRM sendiri.
+   */
+  panggilanStatus: string[];
   /** 3 baris pertama, mentah — untuk menyelaraskan pembaca. */
   sample: string[][];
 }
@@ -488,6 +493,19 @@ export function periksaStruktur(html: string): CrmDebug {
     )
   ).slice(0, 20);
 
+  // Endpoint status membalas 401, jadi kaedah pengesahannya berbeza
+  // daripada cookie halaman. Kutip kod di sekeliling panggilan CRM sendiri
+  // supaya header/kaedah yang betul dapat dilihat.
+  const panggilanStatus: string[] = [];
+  const reP = /masdora-status/g;
+  let pm: RegExpExecArray | null;
+  while ((pm = reP.exec(skripSahaja)) !== null && panggilanStatus.length < 3) {
+    const mula = Math.max(0, pm.index - 400);
+    panggilanStatus.push(
+      skripSahaja.slice(mula, pm.index + 700).replace(/\s+/g, " ")
+    );
+  }
+
   return {
     headers: rows[0] ?? [],
     rowCount: Math.max(0, rows.length - 1),
@@ -496,6 +514,7 @@ export function periksaStruktur(html: string): CrmDebug {
     jsonCebisan,
     statusCebisan,
     endpoints,
+    panggilanStatus,
     sample: rows.slice(1, 4),
   };
 }
