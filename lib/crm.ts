@@ -295,28 +295,83 @@ function kunciId(v: unknown): string {
  * Kunci dinormalkan kepada digit sahaja, kerana CRM mungkin menggunakan
  * gid Shopify penuh manakala rekod kita menyimpan nombor sahaja.
  */
-export async function ambilStatusPasukan(
+/**
+ * Ambil alamat & token penyegerakan yang tertanam dalam halaman CRM.
+ *
+ * CRM menyimpannya sebagai pemboleh ubah JavaScript:
+ *   var SYNC_URL   = "https://masdora.zo.space/api/masdora-status";
+ *   var SYNC_TOKEN = "masdora-...";
+ *
+ * Membacanya dari halaman lebih baik daripada menyimpan salinan sendiri:
+ * kalau CRM menukar tokennya, penyegerakan terus ikut tanpa perlu
+ * mengubah apa-apa di sini atau di Vercel.
+ */
+export function cariTetapanSync(html: string): {
+  url: string;
+  token: string | null;
+} {
+  const url =
+    html.match(/SYNC_URL\s*=\s*["']([^"']+)["']/)?.[1] ?? CRM_STATUS_URL;
+  const token = html.match(/SYNC_TOKEN\s*=\s*["']([^"']+)["']/)?.[1] ?? null;
+  return { url, token };
+}
+
+/**
+ * Endpoint status memerlukan token, bukan cookie sesi — ia membalas
+ * 401 Unauthorized kepada cookie sahaja. Cara token itu dihantar tidak
+ * dinyatakan dalam kod yang dapat dibaca, jadi beberapa kedudukan lazim
+ * dicuba sampai satu berjaya.
+ */
+function calonPermintaan(
+  url: string,
+  token: string,
   cookie: string
+): { url: string; init: RequestInit }[] {
+  const asas = {
+    Accept: "application/json",
+    "User-Agent": "Mozilla/5.0 (compatible; MasdoraDashboard/1.0)",
+    Cookie: cookie,
+  };
+  const pisah = url.includes("?") ? "&" : "?";
+
+  return [
+    { url, init: { headers: { ...asas, Authorization: `Bearer ${token}` } } },
+    { url, init: { headers: { ...asas, "X-Sync-Token": token } } },
+    { url, init: { headers: { ...asas, "X-Token": token } } },
+    { url, init: { headers: { ...asas, "X-Masdora-Token": token } } },
+    { url: `${url}${pisah}token=${encodeURIComponent(token)}`, init: { headers: asas } },
+  ];
+}
+
+export async function ambilStatusPasukan(
+  cookie: string,
+  html?: string
 ): Promise<Map<string, StatusPasukan>> {
   const peta = new Map<string, StatusPasukan>();
+  const { url, token } = html
+    ? cariTetapanSync(html)
+    : { url: CRM_STATUS_URL, token: null };
 
-  const res = await fetch(CRM_STATUS_URL, {
-    headers: {
-      Cookie: cookie,
-      Accept: "application/json",
-      "User-Agent": "Mozilla/5.0 (compatible; MasdoraDashboard/1.0)",
-    },
-    cache: "no-store",
-  });
+  // Tanpa token, cookie sahaja pasti ditolak — tetapi tetap dicuba supaya
+  // ia berfungsi kalau CRM mengubah kaedahnya kemudian.
+  const calon = token
+    ? calonPermintaan(url, token, cookie)
+    : [{ url, init: { headers: { Cookie: cookie, Accept: "application/json" } } }];
 
-  if (!res.ok) return peta;
+  let data: unknown = null;
 
-  let data: unknown;
-  try {
-    data = await res.json();
-  } catch {
-    return peta;
+  for (const c of calon) {
+    try {
+      const res = await fetch(c.url, { ...c.init, cache: "no-store" });
+      if (!res.ok) continue;
+      data = await res.json();
+      break;
+    } catch {
+      continue;
+    }
   }
+
+  if (data === null) return peta;
 
   const simpan = (id: unknown, nilai: unknown) => {
     const k = kunciId(id);

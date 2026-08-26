@@ -25,6 +25,7 @@ import {
   bacaRekod,
   cubaAlamat,
   cubaDenganCookie,
+  cariTetapanSync,
   gabungStatus,
   periksaStruktur,
 } from "@/lib/crm";
@@ -173,7 +174,7 @@ export async function GET(request: Request) {
     }
     let bilStatus = 0;
     try {
-      bilStatus = (await ambilStatusPasukan(hasil.cookie)).size;
+      bilStatus = (await ambilStatusPasukan(hasil.cookie, hasil.html)).size;
     } catch {
       // diabaikan — bahagian lain diagnosis masih berguna
     }
@@ -209,6 +210,17 @@ export async function GET(request: Request) {
       }
     }
 
+    // Adakah token penyegerakan berjaya dijumpai dalam halaman?
+    const tetapan = cariTetapanSync(hasil.html);
+    balasanStatus.unshift({
+      url: tetapan.url,
+      status: tetapan.token ? 200 : 0,
+      jenis: "tetapan sync dalam halaman",
+      cebisan: tetapan.token
+        ? `Token dijumpai (${tetapan.token.length} aksara). Dicuba melalui Bearer, X-Sync-Token, X-Token, X-Masdora-Token dan ?token=`
+        : "Token TIDAK dijumpai dalam halaman — corak SYNC_TOKEN tidak padan.",
+    });
+
     return Response.json({
       ok: true,
       logMasukBerjaya: hasil.berjaya,
@@ -240,7 +252,7 @@ export async function GET(request: Request) {
   // lebih baik daripada tiada data langsung.
   let petaStatus = new Map<string, { status: string | null; note: string | null }>();
   try {
-    petaStatus = await ambilStatusPasukan(hasil.cookie);
+    petaStatus = await ambilStatusPasukan(hasil.cookie, hasil.html);
   } catch {
     // diabaikan dengan sengaja
   }
