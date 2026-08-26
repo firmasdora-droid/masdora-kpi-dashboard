@@ -24,6 +24,7 @@ import {
   ambilStatusPasukan,
   bacaRekod,
   cubaAlamat,
+  cubaDenganCookie,
   gabungStatus,
   periksaStruktur,
 } from "@/lib/crm";
@@ -177,12 +178,30 @@ export async function GET(request: Request) {
       // diabaikan — bahagian lain diagnosis masih berguna
     }
 
+    // Balasan mentah endpoint status. Tanpa ini, "0 status" tidak
+    // memberitahu SEBAB ia 0 — endpoint mati, ditolak, atau bentuk lain.
+    let balasanStatus = null;
+    try {
+      balasanStatus = await cubaDenganCookie(
+        hasil.cookie,
+        "/api/masdora-status"
+      );
+    } catch (e) {
+      balasanStatus = {
+        url: "/api/masdora-status",
+        status: 0,
+        jenis: "",
+        cebisan: e instanceof Error ? e.message : "gagal",
+      };
+    }
+
     return Response.json({
       ok: true,
       logMasukBerjaya: hasil.berjaya,
       // Berapa rekod yang BOLEH dibaca — angka yang paling penting.
       rekodDikenali: bacaRekod(hasil.html).length,
       statusPasukan: bilStatus,
+      balasanStatus,
       jejak: hasil.jejak,
       struktur: periksaStruktur(hasil.html),
     });

@@ -24,6 +24,12 @@ interface DiagnosisCrm {
   logMasukBerjaya?: boolean;
   rekodDikenali?: number;
   statusPasukan?: number;
+  balasanStatus?: {
+    url: string;
+    status: number;
+    jenis: string;
+    cebisan: string;
+  } | null;
   jejak?: {
     statusPost: number;
     adaCookie: boolean;
@@ -396,6 +402,19 @@ export default function RecoveryPage() {
                 masuk {diagnosis.jejak?.masihBorangLogMasuk ? "masih ada" : "tiada"}
                 {diagnosis.struktur?.jsonEmbedded ? " · ada JSON terbenam" : ""}
               </p>
+              {diagnosis.balasanStatus && (
+                <div>
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Balasan /api/masdora-status — HTTP{" "}
+                    {diagnosis.balasanStatus.status} ·{" "}
+                    {diagnosis.balasanStatus.jenis || "tiada jenis"}
+                  </p>
+                  <p className="max-h-40 overflow-auto rounded-lg border border-masdora-orange/30 bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-amber-100">
+                    {diagnosis.balasanStatus.cebisan || "(kosong)"}
+                  </p>
+                </div>
+              )}
+
               {(diagnosis.struktur?.endpoints?.length ?? 0) > 0 && (
                 <div>
                   <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">

@@ -370,28 +370,25 @@ export function gabungStatus(
  * Digunakan untuk mencari dari mana status pasukan diambil, tanpa perlu
  * meneka dan menunggu satu pusingan penuh setiap kali.
  */
-export async function cubaAlamat(
-  kataLaluan: string,
+export interface HasilCubaan {
+  url: string;
+  status: number;
+  jenis: string;
+  cebisan: string;
+}
+
+/** Cuba satu alamat menggunakan cookie sesi yang sudah ada. */
+export async function cubaDenganCookie(
+  cookie: string,
   laluan: string
-): Promise<{ url: string; status: number; jenis: string; cebisan: string }> {
-  const kepala = {
-    "Content-Type": "application/x-www-form-urlencoded",
-    "User-Agent": "Mozilla/5.0 (compatible; MasdoraDashboard/1.0)",
-  };
-
-  // Log masuk semula untuk mendapatkan cookie sesi.
-  const post = await fetch(CRM_URL, {
-    method: "POST",
-    headers: kepala,
-    body: new URLSearchParams({ pw: kataLaluan }).toString(),
-    redirect: "manual",
-    cache: "no-store",
-  });
-  const cookie = kutipCookie(post);
-
+): Promise<HasilCubaan> {
   const url = new URL(laluan, CRM_URL).toString();
   const res = await fetch(url, {
-    headers: { ...kepala, Cookie: cookie, Accept: "application/json, */*" },
+    headers: {
+      Cookie: cookie,
+      Accept: "application/json, */*",
+      "User-Agent": "Mozilla/5.0 (compatible; MasdoraDashboard/1.0)",
+    },
     cache: "no-store",
   });
   const teks = await res.text();
@@ -400,8 +397,27 @@ export async function cubaAlamat(
     url,
     status: res.status,
     jenis: res.headers.get("content-type") ?? "",
-    cebisan: teks.slice(0, 1200),
+    cebisan: teks.slice(0, 1500),
   };
+}
+
+export async function cubaAlamat(
+  kataLaluan: string,
+  laluan: string
+): Promise<HasilCubaan> {
+  // Log masuk untuk mendapatkan cookie sesi.
+  const post = await fetch(CRM_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "Mozilla/5.0 (compatible; MasdoraDashboard/1.0)",
+    },
+    body: new URLSearchParams({ pw: kataLaluan }).toString(),
+    redirect: "manual",
+    cache: "no-store",
+  });
+
+  return cubaDenganCookie(kutipCookie(post), laluan);
 }
 
 /** Periksa struktur halaman tanpa menyimpan apa-apa. */
