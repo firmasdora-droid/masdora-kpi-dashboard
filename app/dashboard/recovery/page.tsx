@@ -19,6 +19,30 @@ interface RecoveryRecord {
 
 const CRM_URL = "https://masdora.zo.space/team/recovery-crm";
 
+/** Bentuk balasan /api/crm-sync?debug=1 */
+interface DiagnosisCrm {
+  logMasukBerjaya?: boolean;
+  rekodDikenali?: number;
+  jejak?: {
+    statusPost: number;
+    adaCookie: boolean;
+    ikutPengalihan: string | null;
+    statusAkhir: number;
+    panjangHtml: number;
+    masihBorangLogMasuk: boolean;
+    cebisan: string;
+  };
+  struktur?: {
+    headers: string[];
+    rowCount: number;
+    tableCount: number;
+    jsonEmbedded: boolean;
+    jsonCebisan: string | null;
+    sample: string[][];
+  };
+  error?: string;
+}
+
 const cardMotion = {
   initial: { opacity: 0, y: 14 },
   animate: { opacity: 1, y: 0 },
@@ -36,16 +60,31 @@ const TIERS: { key: Tier; label: string; pill: string; icon: string }[] = [
 
 const TIER_MAP = Object.fromEntries(TIERS.map((t) => [t.key, t]));
 
-/** Padankan apa sahaja status dari CRM kepada 4 kategori paparan. */
+/**
+ * Padankan apa sahaja status dari CRM kepada 4 kategori paparan.
+ *
+ * CRM menarik data dari Shopify, jadi statusnya termasuk istilah Shopify
+ * seperti PAID, PENDING, EXPIRED, REFUNDED, VOIDED — di samping istilah
+ * CRM sendiri seperti ABANDONED, Open, Recovered, Lost.
+ */
 function tierOf(status: string | null): Tier {
   const s = (status ?? "").toLowerCase();
   if (!s) return "baru";
-  if (/(pulih|recover|berjaya|success|closed won|won|bayar|paid)/.test(s))
-    return "pulih";
-  if (/(gagal|fail|lost|tolak|reject|tak jadi|batal)/.test(s)) return "gagal";
-  if (/(proses|hubung|contact|follow|pending|ongoing|progress)/.test(s))
+
+  // Duit sudah masuk
+  if (/(paid|recover|won|pulih|berjaya|bayar|success)/.test(s)) return "pulih";
+
+  // Kes mati — dibatalkan, dipulangkan, atau hilang
+  if (/(void|refund|cancel|lost|gagal|fail|tolak|reject|batal)/.test(s))
+    return "gagal";
+
+  // Sedang disusuli oleh Maisarah
+  if (/(contact|hubung|follow|progress|ongoing|proses)/.test(s))
     return "proses";
-  if (/(baru|new|open)/.test(s)) return "baru";
+
+  // Kes menunggu tindakan — troli ditinggalkan, bayaran tertunggak
+  if (/(abandon|expire|unpaid|pending|open|new|baru)/.test(s)) return "baru";
+
   return "proses";
 }
 
@@ -67,6 +106,9 @@ export default function RecoveryPage() {
   const [search, setSearch] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  /** Hasil pemeriksaan — dipapar dalam halaman supaya mudah dikongsi. */
+  const [diagnosis, setDiagnosis] = useState<DiagnosisCrm | null>(null);
+  const [checking, setChecking] = useState(false);
 
   /**
    * Tarik data terkini dari CRM, kemudian baca dari database.
@@ -94,6 +136,19 @@ export default function RecoveryPage() {
       setSyncMsg("Gagal menghubungi CRM.");
     }
     setSyncing(false);
+  }, []);
+
+  /** Periksa apa yang pelayan CRM sebenarnya balas — tanpa menyimpan apa-apa. */
+  const periksa = useCallback(async () => {
+    setChecking(true);
+    setDiagnosis(null);
+    try {
+      const res = await fetch("/api/crm-sync?debug=1", { cache: "no-store" });
+      setDiagnosis((await res.json()) as DiagnosisCrm);
+    } catch {
+      setDiagnosis({ error: "Gagal menghubungi pelayan." });
+    }
+    setChecking(false);
   }, []);
 
   const load = useCallback(async () => {
@@ -237,13 +292,13 @@ export default function RecoveryPage() {
                 {syncMsg ??
                   "Dashboard akan log masuk ke CRM dan menarik data secara automatik sebaik CRM_TEAM_PASSWORD ditetapkan di Vercel."}
               </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Rujuk fail{" "}
-                <span className="font-mono text-slate-300">
-                  PANDUAN-SAMBUNG-CRM.md
-                </span>{" "}
-                dalam projek.
-              </p>
+              <button
+                onClick={periksa}
+                disabled={checking}
+                className="btn-secondary mt-3"
+              >
+                {checking ? "Memeriksa..." : "Periksa Punca"}
+              </button>
             </>
           ) : lastSync ? (
             <p className={lastSync.basi ? "text-amber-200" : "text-slate-400"}>
@@ -262,6 +317,83 @@ export default function RecoveryPage() {
         </motion.div>
       )}
 
+      {/* Hasil pemeriksaan — dipapar di skrin supaya mudah dikongsi */}
+      {diagnosis && (
+        <motion.div {...cardMotion} className="card space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-white">Hasil Pemeriksaan CRM</h3>
+            <button
+              className="text-xs font-bold text-slate-400 hover:text-white"
+              onClick={() => setDiagnosis(null)}
+            >
+              Tutup
+            </button>
+          </div>
+
+          {diagnosis.error ? (
+            <p className="text-sm text-red-300">{diagnosis.error}</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Fakta
+                  label="Log masuk"
+                  nilai={diagnosis.logMasukBerjaya ? "Berjaya" : "Gagal"}
+                  baik={!!diagnosis.logMasukBerjaya}
+                />
+                <Fakta
+                  label="Rekod dikenali"
+                  nilai={String(diagnosis.rekodDikenali ?? 0)}
+                  baik={(diagnosis.rekodDikenali ?? 0) > 0}
+                />
+                <Fakta
+                  label="Baris data"
+                  nilai={String(diagnosis.struktur?.rowCount ?? 0)}
+                  baik={(diagnosis.struktur?.rowCount ?? 0) > 0}
+                />
+                <Fakta
+                  label="Saiz halaman"
+                  nilai={`${Math.round(
+                    (diagnosis.jejak?.panjangHtml ?? 0) / 1024
+                  )} KB`}
+                  baik={(diagnosis.jejak?.panjangHtml ?? 0) > 20000}
+                />
+              </div>
+
+              {(diagnosis.struktur?.headers?.length ?? 0) > 0 && (
+                <div>
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Lajur yang dibaca
+                  </p>
+                  <p className="text-xs text-slate-300">
+                    {diagnosis.struktur!.headers.join(" · ")}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Apa yang pelayan CRM balas
+                </p>
+                <p className="max-h-40 overflow-auto rounded-lg border border-white/10 bg-black/30 p-2 font-mono text-[11px] leading-relaxed text-slate-300">
+                  {diagnosis.jejak?.cebisan || "(kosong)"}
+                </p>
+              </div>
+
+              <p className="text-[11px] text-slate-500">
+                Status POST {diagnosis.jejak?.statusPost} · cookie{" "}
+                {diagnosis.jejak?.adaCookie ? "ada" : "tiada"} · borang log
+                masuk {diagnosis.jejak?.masihBorangLogMasuk ? "masih ada" : "tiada"}
+                {diagnosis.struktur?.jsonEmbedded ? " · ada JSON terbenam" : ""}
+              </p>
+              <p className="text-[11px] text-amber-200">
+                Hantar tangkapan skrin kotak ini kepada saya — ia cukup untuk
+                saya tahu langkah seterusnya.
+              </p>
+            </>
+          )}
+        </motion.div>
+      )}
+
       {/* Dua nombor utama */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <motion.div
@@ -269,13 +401,13 @@ export default function RecoveryPage() {
           className="rounded-2xl border border-masdora-orange/25 bg-gradient-to-br from-masdora-orange/20 to-masdora-orange/5 p-6"
         >
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
-            Customer dihubungi
+            Jumlah kes recovery
           </p>
           <p className="mt-1 text-4xl font-black text-white">
             {filtered.length.toLocaleString("ms-MY")}
           </p>
           <p className="mt-1 text-[11px] text-slate-400">
-            {counts.pulih} berjaya · {counts.proses} dalam proses
+            {counts.pulih} berjaya pulih · {counts.baru} menunggu tindakan
           </p>
         </motion.div>
 
@@ -380,6 +512,35 @@ export default function RecoveryPage() {
           </table>
         </motion.div>
       )}
+    </div>
+  );
+}
+
+/** Satu fakta ringkas dalam panel pemeriksaan. */
+function Fakta({
+  label,
+  nilai,
+  baik,
+}: {
+  label: string;
+  nilai: string;
+  baik: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border p-2.5 ${
+        baik
+          ? "border-masdora-olive/35 bg-masdora-olive/10"
+          : "border-masdora-alert/35 bg-masdora-alert/10"
+      }`}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-black text-white">
+        {baik ? "✓ " : "✕ "}
+        {nilai}
+      </p>
     </div>
   );
 }

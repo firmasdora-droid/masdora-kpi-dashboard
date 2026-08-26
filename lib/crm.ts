@@ -272,6 +272,154 @@ export function periksaStruktur(html: string): CrmDebug {
   };
 }
 
+// ---------------------------------------------------------------- JSON Shopify
+
+/**
+ * Petik satu objek JSON lengkap bermula pada kurungan `{` yang diberi,
+ * dengan mengira kedalaman kurungan dan mengabaikan kurungan dalam teks.
+ */
+function petikObjek(s: string, mula: number): string | null {
+  let dalam = 0;
+  let dalamTeks = false;
+  let escape = false;
+
+  for (let i = mula; i < s.length; i++) {
+    const c = s[i];
+    if (dalamTeks) {
+      if (escape) escape = false;
+      else if (c === "\\") escape = true;
+      else if (c === '"') dalamTeks = false;
+      continue;
+    }
+    if (c === '"') dalamTeks = true;
+    else if (c === "{") dalam++;
+    else if (c === "}") {
+      dalam--;
+      if (dalam === 0) return s.slice(mula, i + 1);
+    }
+  }
+  return null;
+}
+
+interface NodShopify {
+  id?: string;
+  name?: string;
+  createdAt?: string;
+  email?: string;
+  phone?: string;
+  displayFinancialStatus?: string;
+  abandonedCheckoutUrl?: string;
+  totalPriceSet?: {
+    presentmentMoney?: { amount?: string };
+    shopMoney?: { amount?: string };
+  };
+  customer?: { displayName?: string; phone?: string; email?: string };
+  billingAddress?: { phone?: string };
+  shippingAddress?: { phone?: string };
+  lineItems?: { edges?: { node?: { title?: string; quantity?: number } }[] };
+}
+
+/**
+ * Kutip nod pesanan/checkout dari JSON Shopify yang terbenam dalam halaman.
+ *
+ * Jadual CRM diisi oleh JavaScript selepas halaman dibuka, jadi HTML yang
+ * diterima pelayan hanya mengandungi baris "Loading live data from
+ * Shopify…". Tetapi data sebenar terbenam dalam halaman sebagai JSON —
+ * itulah yang dibaca di sini.
+ */
+function kutipNodShopify(html: string): NodShopify[] {
+  // Data mungkin terbenam terus, atau sebagai teks JavaScript dengan petikan
+  // yang di-escape. Cuba kedua-duanya.
+  const calon = [html, html.replace(/\\"/g, '"')];
+  const nod: NodShopify[] = [];
+  const nampak = new Set<string>();
+
+  for (const s of calon) {
+    const re = /"node"\s*:\s*\{/g;
+    let m: RegExpExecArray | null;
+
+    while ((m = re.exec(s)) !== null) {
+      const braceIdx = s.indexOf("{", m.index + 6);
+      if (braceIdx < 0) continue;
+      const objStr = petikObjek(s, braceIdx);
+      if (!objStr) continue;
+
+      let o: NodShopify;
+      try {
+        o = JSON.parse(objStr) as NodShopify;
+      } catch {
+        continue;
+      }
+
+      // lineItems juga menggunakan bentuk {"node":{...}}, jadi hanya nod
+      // yang benar-benar pesanan/checkout diterima.
+      const pesanan =
+        o.totalPriceSet !== undefined ||
+        o.customer !== undefined ||
+        o.email !== undefined ||
+        o.abandonedCheckoutUrl !== undefined;
+      if (!pesanan) continue;
+
+      const kunci = String(o.id ?? o.name ?? objStr.slice(0, 120));
+      if (nampak.has(kunci)) continue;
+      nampak.add(kunci);
+      nod.push(o);
+    }
+
+    if (nod.length > 0) break;
+  }
+
+  return nod;
+}
+
+function nodKeRekod(o: NodShopify): CrmRow | null {
+  // "gid://shopify/Order/7898953482531" -> "7898953482531"
+  const idPanjang = String(o.id ?? "").match(/(\d{6,})/)?.[1];
+  const noNama = String(o.name ?? "").replace(/\D/g, "");
+  const kunci = idPanjang || noNama;
+  if (!kunci) return null;
+
+  const jumlah =
+    o.totalPriceSet?.presentmentMoney?.amount ??
+    o.totalPriceSet?.shopMoney?.amount ??
+    "0";
+
+  const produk = (o.lineItems?.edges ?? [])
+    .map((e) => e.node?.title)
+    .filter(Boolean)
+    .join(" · ");
+
+  // Checkout yang ditinggalkan tiada status kewangan — tandakan sendiri.
+  const status = o.abandonedCheckoutUrl
+    ? "ABANDONED"
+    : o.displayFinancialStatus ?? null;
+
+  return {
+    source_id: `crm-${kunci}`,
+    customer_name: o.customer?.displayName || null,
+    customer_contact:
+      o.email ||
+      o.customer?.email ||
+      o.phone ||
+      o.customer?.phone ||
+      o.billingAddress?.phone ||
+      o.shippingAddress?.phone ||
+      null,
+    status,
+    amount_rm: nombor(jumlah),
+    contacted_at: o.createdAt ? o.createdAt.slice(0, 10) : null,
+    handler: null,
+    note: produk || null,
+  };
+}
+
+/** Baca rekod dari JSON Shopify yang terbenam dalam halaman. */
+export function bacaRekodJson(html: string): CrmRow[] {
+  return kutipNodShopify(html)
+    .map(nodKeRekod)
+    .filter((r): r is CrmRow => r !== null);
+}
+
 /**
  * Tukar HTML CRM menjadi rekod.
  *
@@ -280,6 +428,11 @@ export function periksaStruktur(html: string): CrmDebug {
  * penyegerakan.
  */
 export function bacaRekod(html: string): CrmRow[] {
+  // JSON terbenam didahulukan: jadual CRM diisi oleh JavaScript, jadi HTML
+  // yang sampai ke pelayan hanya mengandungi baris "Loading live data…".
+  const dariJson = bacaRekodJson(html);
+  if (dariJson.length > 0) return dariJson;
+
   const t = jadualTerbesar(html);
   if (!t) return [];
 

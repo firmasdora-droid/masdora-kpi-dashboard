@@ -137,6 +137,8 @@ export async function GET(request: Request) {
     return Response.json({
       ok: true,
       logMasukBerjaya: hasil.berjaya,
+      // Berapa rekod yang BOLEH dibaca — angka yang paling penting.
+      rekodDikenali: bacaRekod(hasil.html).length,
       jejak: hasil.jejak,
       struktur: periksaStruktur(hasil.html),
     });
