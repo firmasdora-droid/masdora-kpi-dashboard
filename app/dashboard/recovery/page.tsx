@@ -65,6 +65,36 @@ export default function RecoveryPage() {
   const [error, setError] = useState<string | null>(null);
   const [tierFilter, setTierFilter] = useState<Tier | "">("");
   const [search, setSearch] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
+  /**
+   * Tarik data terkini dari CRM, kemudian baca dari database.
+   *
+   * Dashboard log masuk sendiri ke CRM di sebelah pelayan — tiada apa yang
+   * perlu diubah pada CRM, dan kata laluannya tidak pernah sampai ke
+   * pelayar ini.
+   */
+  const segerak = useCallback(async (paksa = false) => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch(`/api/crm-sync${paksa ? "?force=1" : ""}`, {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (json.ok) {
+        if (json.dilangkau) setSyncMsg(json.sebab);
+        else if (json.disegerakkan)
+          setSyncMsg(`${json.disegerakkan} rekod ditarik dari CRM.`);
+      } else {
+        setSyncMsg(json.error ?? "Gagal menarik data dari CRM.");
+      }
+    } catch {
+      setSyncMsg("Gagal menghubungi CRM.");
+    }
+    setSyncing(false);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,9 +116,13 @@ export default function RecoveryPage() {
     setLoading(false);
   }, [supabase]);
 
+  // Buka halaman = tarik dari CRM dahulu, kemudian papar.
   useEffect(() => {
-    load();
-  }, [load]);
+    (async () => {
+      await segerak();
+      await load();
+    })();
+  }, [segerak, load]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -148,8 +182,19 @@ export default function RecoveryPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={load} className="btn-secondary" disabled={loading}>
-            {loading ? "Memuatkan..." : "Muat Semula"}
+          <button
+            onClick={async () => {
+              await segerak(true);
+              await load();
+            }}
+            className="btn-secondary"
+            disabled={loading || syncing}
+          >
+            {syncing
+              ? "Menarik dari CRM..."
+              : loading
+              ? "Memuatkan..."
+              : "Tarik Data CRM"}
           </button>
           <a
             href={CRM_URL}
@@ -186,14 +231,15 @@ export default function RecoveryPage() {
           {records.length === 0 ? (
             <>
               <p className="font-bold text-red-200">
-                Sistem CRM belum pernah menghantar data ke dashboard
+                Belum ada data ditarik dari CRM
               </p>
               <p className="mt-1 text-xs text-slate-300">
-                Halaman ini kosong bukan kerana tiada customer — tetapi kerana
-                saluran automatik antara CRM dan dashboard belum disambung.
-                Dashboard sudah sedia menerima; CRM perlu diprogramkan untuk
-                menghantar. Rujuk fail{" "}
-                <span className="font-mono text-slate-200">
+                {syncMsg ??
+                  "Dashboard akan log masuk ke CRM dan menarik data secara automatik sebaik CRM_TEAM_PASSWORD ditetapkan di Vercel."}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Rujuk fail{" "}
+                <span className="font-mono text-slate-300">
                   PANDUAN-SAMBUNG-CRM.md
                 </span>{" "}
                 dalam projek.

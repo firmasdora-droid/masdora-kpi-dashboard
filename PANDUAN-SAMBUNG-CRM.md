@@ -1,72 +1,81 @@
-# Panduan: Sambungkan Recovery CRM ke Dashboard
+# Panduan: Dashboard Tarik Data Recovery CRM Secara Automatik
 
-Matlamat: Maisarah kemas kini rekod dalam CRM → dashboard terus tunjuk
-bilangan dihubungi, berjaya pulih, tidak berjaya, dan jumlah RM dipulihkan.
-Tiada kerja manual, tiada salin-tampal.
+Maisarah kemas kini rekod dalam CRM seperti biasa → dashboard log masuk
+sendiri ke CRM, tarik data, dan papar bilangan dihubungi / berjaya pulih /
+tidak berjaya / jumlah RM.
 
----
-
-## Keadaan sekarang
-
-| Bahagian | Status |
-|---|---|
-| Dashboard papar data | ✅ Sudah siap |
-| Dashboard terima data | ✅ Sudah siap (`/api/ingest/recovery`) |
-| Jadual database | ✅ Sudah siap (`recovery_records`) |
-| Kunci rahsia di Vercel | ✅ Sudah ada (`INGEST_SECRET`) |
-| **CRM hantar data** | ❌ **Belum dibuat — ini satu-satunya yang tinggal** |
-
-Dashboard sudah sedia menunggu. Sistem CRM di `masdora.zo.space` belum
-pernah menghantar apa-apa kepadanya. Halaman Recovery CRM dalam dashboard
-kosong kerana sebab ini, bukan kerana tiada customer.
+**Tiada apa yang perlu diubah pada sistem CRM.**
 
 ---
 
-## Apa yang perlu dibuat pada CRM
+## Satu langkah sahaja dari kamu
 
-Setiap kali rekod dikemas kini (atau sekali setiap 15 minit), CRM perlu
-hantar satu permintaan HTTP POST ke:
+Dashboard perlu tahu kata laluan team CRM supaya ia boleh log masuk sendiri.
+Kata laluan itu disimpan di Vercel — ia tidak pernah dihantar ke pelayar
+sesiapa, dan tidak kelihatan dalam dashboard.
+
+1. Buka https://vercel.com/dashboard → projek **masdora-kpi-dashboard**
+2. **Settings** → **Environment Variables** → **Add New**
+
+   | Ruangan | Isi |
+   |---|---|
+   | Key | `CRM_TEAM_PASSWORD` |
+   | Value | kata laluan team CRM |
+   | Environments | tanda **Production**, **Preview**, **Development** |
+   | Sensitive | hidupkan |
+
+3. **Save**
+4. Tab **Deployments** → deployment paling atas → **⋯** → **Redeploy**
+
+Selesai. Buka halaman **Recovery CRM** — data akan masuk sendiri.
+
+---
+
+## Bagaimana ia berfungsi
 
 ```
-https://masdora-kpi-dashboard.vercel.app/api/ingest/recovery
+Maisarah kemas kini CRM
+        │
+        ▼
+masdora.zo.space/team/recovery-crm
+        │
+        │  dashboard log masuk (POST pw=...) dan baca jadual
+        ▼
+/api/crm-sync  ──►  jadual recovery_records  ──►  halaman Recovery CRM
+                                              └►  Laporan Mingguan PDF
 ```
 
-Dengan body JSON seperti ini:
+Penyegerakan berlaku:
 
-```json
-{
-  "secret": "<nilai INGEST_SECRET dari Vercel>",
-  "rows": [
-    {
-      "source_id": "rec-1024",
-      "customer_name": "Siti",
-      "customer_contact": "60123456789",
-      "status": "pulih",
-      "amount_rm": 250.00,
-      "contacted_at": "2026-08-07",
-      "handler": "MAI",
-      "note": "follow up kedua"
-    }
-  ]
-}
-```
+- **Setiap kali sesiapa membuka halaman Recovery CRM** (paling kerap sekali
+  setiap 5 minit, supaya CRM tidak dibebani)
+- **Bila butang "Tarik Data CRM" ditekan** — segera, tanpa menunggu
+- Boleh juga dipanggil oleh automasi luar:
+  `GET /api/crm-sync?secret=<INGEST_SECRET>`
 
-### Ruangan
+### Kenapa ada had 5 minit
 
-| Ruangan | Wajib | Keterangan |
-|---|---|---|
-| `source_id` | **Ya** | ID unik rekod dalam CRM. Kalau rekod sama dihantar semula, dashboard **kemas kini** rekod itu — tidak jadi dua. Jadi selamat hantar berulang kali. |
-| `status` | Ya | Teks bebas. Dashboard padankan sendiri (lihat bawah). |
-| `contacted_at` | Ya | `"2026-08-07"` atau `"7/8/2026"` |
-| `amount_rm` | — | Nombor. Kosong dianggap 0. |
-| `customer_name` | — | |
-| `customer_contact` | — | |
-| `handler` | — | Kod handler, contoh `MAI` |
-| `note` | — | |
+Kalau tiga orang membuka halaman itu serentak, tanpa had ini CRM akan
+menerima tiga permintaan log masuk sekali gus. Tekan **Tarik Data CRM**
+untuk memintas had itu bila kamu perlukan data terkini serta-merta.
 
-### Status — tidak perlu ikut ejaan tepat
+---
 
-Dashboard padankan status secara automatik kepada 4 kategori:
+## Rekod tidak akan jadi dua
+
+Setiap rekod dipadankan melalui `source_id`:
+
+- Kalau jadual CRM ada lajur ID → `crm-<id>`
+- Kalau tiada → `crm-<nama><telefon>`
+
+Jadi menarik data 100 kali tetap menghasilkan satu baris bagi setiap
+customer — cuma dikemas kini.
+
+---
+
+## Status — tidak perlu ejaan tepat
+
+Dashboard padankan sendiri apa sahaja istilah yang CRM guna:
 
 | Kategori dashboard | Perkataan yang dikenali |
 |---|---|
@@ -75,112 +84,61 @@ Dashboard padankan status secara automatik kepada 4 kategori:
 | **Sedang Dihubungi** | proses, hubung, contact, follow, pending, ongoing, progress |
 | **Baru** | baru, new, open |
 
-Jadi CRM boleh guna istilahnya sendiri — tidak perlu diubah.
+Maisarah tidak perlu mengubah cara dia bekerja.
 
 ---
 
-## Contoh kod
+## Lajur dikesan melalui tajuk, bukan kedudukan
 
-### Kalau CRM ada bahagian pelayan (Cloudflare Worker / Pages Function)
+| Data | Tajuk lajur yang dikenali |
+|---|---|
+| ID | ID, NO, BIL, REF |
+| Nama | NAMA, NAME, CUSTOMER, PELANGGAN |
+| Telefon | PHONE, TELEFON, CONTACT, NOMBOR, WHATSAPP |
+| Status | STATUS, KEADAAN |
+| Jumlah | AMOUNT, JUMLAH, RM, NILAI, HARGA, VALUE |
+| Tarikh | TARIKH, DATE, CONTACTED, DIHUBUNGI, FOLLOW |
+| Handler | HANDLER, AGENT, PIC, OLEH, CS |
+| Catatan | NOTE, NOTA, CATATAN, REMARK |
 
-```js
-// Hantar semua rekod recovery ke dashboard.
-// Letak INGEST_SECRET sebagai secret pada projek CRM — jangan tulis
-// kata rahsia itu terus dalam kod.
-async function hantarKeDashboard(env, rekod) {
-  const res = await fetch(
-    "https://masdora-kpi-dashboard.vercel.app/api/ingest/recovery",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        secret: env.INGEST_SECRET,
-        rows: rekod.map((r) => ({
-          source_id: String(r.id),
-          customer_name: r.nama,
-          customer_contact: r.telefon,
-          status: r.status,
-          amount_rm: r.jumlah,
-          contacted_at: r.tarikh_hubung,
-          handler: r.handler,
-          note: r.nota,
-        })),
-      }),
-    }
-  );
-  return res.json(); // { ok: true, upserted: N, skipped: M }
-}
-```
-
-### Jalankan automatik setiap 15 minit (Cloudflare Worker cron)
-
-Dalam `wrangler.toml`:
-
-```toml
-[triggers]
-crons = ["*/15 * * * *"]
-```
-
-Dalam worker:
-
-```js
-export default {
-  async scheduled(event, env) {
-    const { results } = await env.DB.prepare(
-      "SELECT * FROM recovery_records"
-    ).all();
-    await hantarKeDashboard(env, results);
-  },
-};
-```
+Menambah lajur baru atau menyusun semula lajur dalam CRM **tidak akan**
+merosakkan penyegerakan.
 
 ---
 
-## Cara uji tanpa menyentuh CRM
+## Kalau data tidak masuk
 
-Ini membuktikan saluran itu berfungsi sebelum sesiapa mengubah CRM.
-Ganti `<SECRET>` dengan nilai `INGEST_SECRET` dari Vercel
-(Settings → Environment Variables).
+Buka halaman Recovery CRM — mesejnya akan menyatakan puncanya.
 
-```bash
-curl -X POST https://masdora-kpi-dashboard.vercel.app/api/ingest/recovery -H "Content-Type: application/json" -d '{"secret":"<SECRET>","rows":[{"source_id":"UJIAN-001","customer_name":"UJIAN - boleh padam","status":"proses","amount_rm":1,"contacted_at":"2026-08-25","handler":"MAI","note":"rekod ujian"}]}'
-```
-
-Jangkaan: `{"ok":true,"upserted":1,"skipped":0}`
-
-Kemudian buka halaman **Recovery CRM** dalam dashboard — rekod "UJIAN"
-sepatutnya keluar. Selepas itu buang rekod ujian itu dalam Supabase:
-
-```sql
-delete from recovery_records where source_id = 'UJIAN-001';
-```
-
-### Kalau ujian gagal
-
-| Balasan | Maksud | Tindakan |
+| Mesej | Maksud | Tindakan |
 |---|---|---|
-| `401 Unauthorized` | Secret tidak sama | Semak nilai `INGEST_SECRET` di Vercel |
-| `500 Server belum dikonfigurasi` | `INGEST_SECRET` tiada di Vercel | Tambah env var itu, kemudian Redeploy |
-| `500 Gagal menyimpan rekod` | `SUPABASE_SERVICE_ROLE_KEY` salah, atau jadual tiada | Run `add-recovery-crm.sql` di Supabase |
-| `400 Medan 'rows' mesti array` | Bentuk JSON salah | `rows` mesti array, walaupun satu rekod |
+| `CRM_TEAM_PASSWORD belum ditetapkan` | Langkah di atas belum dibuat | Tetapkan env var, kemudian Redeploy |
+| `Kata laluan CRM ditolak` | Kata laluan salah atau sudah ditukar | Kemas kini nilai di Vercel |
+| `Tiada baris data dikenali` | Log masuk berjaya, tetapi jadual berbeza daripada jangkaan | Lihat bawah |
+| `CRM membalas HTTP 5xx` | CRM sedang tidak berfungsi | Cuba semula kemudian |
+
+### Kalau "tiada baris data dikenali"
+
+Ini bermakna dashboard berjaya masuk tetapi tidak mengenali bentuk
+jadualnya. Sebagai manager, buka pautan ini dalam pelayar (kamu perlu sudah
+log masuk ke dashboard):
+
+```
+https://masdora-kpi-dashboard.vercel.app/api/crm-sync?debug=1
+```
+
+Ia akan memaparkan tajuk lajur sebenar CRM dan 3 baris pertama, **tanpa
+menyimpan apa-apa**. Hantar hasil itu kepada saya dan saya laraskan pembaca
+supaya padan. Halaman ini terhad kepada Marketing Manager & CEO sahaja.
 
 ---
 
-## Siapa boleh buat kerja ini
+## Nota keselamatan
 
-Sesiapa yang boleh mengubah kod sistem CRM di `masdora.zo.space`. Ia kerja
-sekali sahaja — kira-kira 20 baris kod.
-
-Kata rahsia `INGEST_SECRET` perlu dimasukkan sebagai **secret pada projek
-CRM**, bukan ditulis dalam kod dan bukan dihantar melalui WhatsApp.
-
----
-
-## Nota penting
-
-- **Selamat hantar berulang kali.** Rekod dipadankan melalui `source_id`,
-  jadi menghantar rekod yang sama 100 kali tetap menghasilkan satu baris.
-- **Dashboard tidak menolak data ke CRM.** Alirannya satu hala sahaja:
-  CRM → dashboard. Mengubah data dalam dashboard tidak mengubah CRM.
-- **Laporan Mingguan PDF** sudah ada seksyen Recovery CRM. Sebaik data
-  masuk, ia terus keluar dalam laporan kepada CEO tanpa kerja tambahan.
+- Kata laluan CRM disimpan sebagai secret Vercel, dibaca di sebelah pelayan
+  sahaja. Ia tidak pernah dihantar ke pelayar dan tidak kelihatan dalam
+  mana-mana halaman dashboard.
+- Aliran data **satu hala**: CRM → dashboard. Dashboard tidak boleh
+  mengubah apa-apa dalam CRM.
+- Mod `?debug=1` memaparkan data customer, jadi ia dihadkan kepada
+  Marketing Manager & CEO.
