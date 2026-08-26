@@ -26,6 +26,10 @@ export interface CrmRow {
   contacted_at: string | null;
   handler: string | null;
   note: string | null;
+  /** Band keutamaan CRM (H / M / L). */
+  priority?: string | null;
+  /** Umur kes, contoh "2d". */
+  age?: string | null;
 }
 
 export interface CrmDebug {
@@ -283,20 +287,23 @@ export function bacaRekod(html: string): CrmRow[] {
   if (rows.length < 2) return [];
 
   const headers = rows[0];
-  const cId = cariLajur(headers, ["ID", "NO", "BIL", "REF"]);
-  const cNama = cariLajur(headers, ["NAMA", "NAME", "CUSTOMER", "PELANGGAN"]);
+  const cNama = cariLajur(headers, ["CUSTOMER", "NAMA", "NAME", "PELANGGAN"]);
   const cHubungi = cariLajur(headers, [
+    "CONTACT",
+    "EMAIL",
     "PHONE",
     "TELEFON",
-    "CONTACT",
     "NOMBOR",
     "WHATSAPP",
   ]);
+  // "STATUS & NOTE" ialah keputusan semasa (Open/Won/...). "STATE" pula
+  // menerangkan jenis kes (Abandoned/Expired). Keputusan diutamakan.
   const cStatus = cariLajur(headers, ["STATUS", "KEADAAN"]);
+  const cState = cariLajur(headers, ["STATE"]);
   const cJumlah = cariLajur(headers, [
+    "RM",
     "AMOUNT",
     "JUMLAH",
-    "RM",
     "NILAI",
     "HARGA",
     "VALUE",
@@ -308,38 +315,61 @@ export function bacaRekod(html: string): CrmRow[] {
     "DIHUBUNGI",
     "FOLLOW",
   ]);
-  const cHandler = cariLajur(headers, ["HANDLER", "AGENT", "PIC", "OLEH", "CS"]);
-  const cNota = cariLajur(headers, ["NOTE", "NOTA", "CATATAN", "REMARK"]);
+  const cHandler = cariLajur(headers, ["HANDLER", "AGENT", "PIC", "OLEH"]);
+  const cItem = cariLajur(headers, ["ITEM", "PRODUK", "PRODUCT"]);
+  // Lajur CRM bernama "STATUS & NOTE" — ia mengandungi "NOTE", jadi tanpa
+  // pengecualian ini nilai status akan disalin semula sebagai catatan.
+  const cNotaMentah = cariLajur(headers, ["NOTA", "CATATAN", "REMARK", "NOTE"]);
+  const cNota = cNotaMentah === cStatus ? -1 : cNotaMentah;
+  const cPriority = cariLajur(headers, ["PRIORITY", "KEUTAMAAN"]);
+  const cAge = cariLajur(headers, ["AGE", "UMUR"]);
 
   const out: CrmRow[] = [];
+  const nampak = new Set<string>();
 
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     const get = (idx: number) => (idx >= 0 && idx < r.length ? r[idx] : "");
 
-    const nama = get(cNama);
+    const selNama = get(cNama);
     const hubungi = get(cHubungi);
 
-    // source_id mesti stabil supaya rekod dikemas kini, bukan diduplikasi.
-    // Kalau CRM tiada lajur ID, guna gabungan nama + nombor telefon.
-    const idMentah = get(cId);
-    const sourceId = idMentah
-      ? `crm-${idMentah}`
+    // Sel CUSTOMER mengandungi nama DAN nombor pesanan, contoh:
+    // "Amely Md Noor #41691769405731". Pisahkan kedua-duanya.
+    const noPesanan = r.join(" ").match(/#\s*(\d{3,})/)?.[1] ?? "";
+    const nama = selNama.replace(/#\s*\d{3,}/, "").trim();
+
+    // source_id mesti stabil supaya rekod dikemas kini dan bukan diduplikasi.
+    const sourceId = noPesanan
+      ? `crm-${noPesanan}`
       : nama || hubungi
       ? `crm-${(nama + "|" + hubungi).toLowerCase().replace(/\s+/g, "")}`
       : "";
 
-    if (!sourceId) continue; // baris kosong atau baris jumlah
+    if (!sourceId || nampak.has(sourceId)) continue;
+    nampak.add(sourceId);
+
+    // Ambil emel dari sel CONTACT — sel itu turut mengandungi teks butang
+    // ("WhatsApp", "Script", "Email") yang bukan maklumat hubungan.
+    const emel = hubungi.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)?.[0] ?? "";
+
+    const status = get(cStatus) || get(cState) || null;
+
+    // ITEM ialah produk yang ditinggalkan — simpan sebagai catatan supaya
+    // Maisarah tahu apa yang perlu disusuli tanpa membuka CRM.
+    const nota = [get(cNota), get(cItem)].filter(Boolean).join(" — ") || null;
 
     out.push({
       source_id: sourceId,
       customer_name: nama || null,
-      customer_contact: hubungi || null,
-      status: get(cStatus) || null,
+      customer_contact: emel || hubungi || null,
+      status,
       amount_rm: nombor(get(cJumlah)),
       contacted_at: tarikh(get(cTarikh)),
       handler: get(cHandler)?.toUpperCase() || null,
-      note: get(cNota) || null,
+      note: nota,
+      priority: get(cPriority) || null,
+      age: get(cAge) || null,
     });
   }
 
