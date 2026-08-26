@@ -29,7 +29,7 @@ interface DiagnosisCrm {
     status: number;
     jenis: string;
     cebisan: string;
-  } | null;
+  }[];
   jejak?: {
     statusPost: number;
     adaCookie: boolean;
@@ -402,16 +402,27 @@ export default function RecoveryPage() {
                 masuk {diagnosis.jejak?.masihBorangLogMasuk ? "masih ada" : "tiada"}
                 {diagnosis.struktur?.jsonEmbedded ? " · ada JSON terbenam" : ""}
               </p>
-              {diagnosis.balasanStatus && (
+              {(diagnosis.balasanStatus?.length ?? 0) > 0 && (
                 <div>
-                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Balasan /api/masdora-status — HTTP{" "}
-                    {diagnosis.balasanStatus.status} ·{" "}
-                    {diagnosis.balasanStatus.jenis || "tiada jenis"}
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-masdora-orange">
+                    Balasan endpoint status
                   </p>
-                  <p className="max-h-40 overflow-auto rounded-lg border border-masdora-orange/30 bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-amber-100">
-                    {diagnosis.balasanStatus.cebisan || "(kosong)"}
-                  </p>
+                  <div className="space-y-1.5">
+                    {diagnosis.balasanStatus!.map((b, i) => (
+                      <div
+                        key={i}
+                        className="rounded-lg border border-masdora-orange/30 bg-black/40 p-2"
+                      >
+                        <p className="font-mono text-[10px] text-slate-400">
+                          HTTP {b.status} · {b.jenis || "tiada jenis"} ·{" "}
+                          {b.url.replace("https://masdora.zo.space", "")}
+                        </p>
+                        <p className="mt-1 max-h-28 overflow-auto font-mono text-[11px] leading-relaxed text-amber-100">
+                          {b.cebisan || "(kosong)"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

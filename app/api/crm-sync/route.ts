@@ -180,19 +180,33 @@ export async function GET(request: Request) {
 
     // Balasan mentah endpoint status. Tanpa ini, "0 status" tidak
     // memberitahu SEBAB ia 0 — endpoint mati, ditolak, atau bentuk lain.
-    let balasanStatus = null;
-    try {
-      balasanStatus = await cubaDenganCookie(
-        hasil.cookie,
-        "/api/masdora-status"
-      );
-    } catch (e) {
-      balasanStatus = {
-        url: "/api/masdora-status",
-        status: 0,
-        jenis: "",
-        cebisan: e instanceof Error ? e.message : "gagal",
-      };
+    //
+    // Beberapa variasi dicuba sekali gus: endpoint mungkin memerlukan
+    // parameter, atau hanya membalas kepada POST. Mencuba semuanya dalam
+    // satu pusingan mengelakkan berbalas-balas.
+    const percubaan = [
+      "/api/masdora-status",
+      "/api/masdora-status?all=1",
+      "/api/masdora-status/overrides",
+    ];
+    const balasanStatus: {
+      url: string;
+      status: number;
+      jenis: string;
+      cebisan: string;
+    }[] = [];
+
+    for (const p of percubaan) {
+      try {
+        balasanStatus.push(await cubaDenganCookie(hasil.cookie, p));
+      } catch (e) {
+        balasanStatus.push({
+          url: p,
+          status: 0,
+          jenis: "",
+          cebisan: e instanceof Error ? e.message : "gagal",
+        });
+      }
     }
 
     return Response.json({
