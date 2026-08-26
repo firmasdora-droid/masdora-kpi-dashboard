@@ -300,10 +300,90 @@ export async function GET(request: Request) {
     );
   }
 
+  // ---------- Jualan pulih masuk ke jualan Maisarah ----------
+  const jualan = await catatJualanPulih(admin, rekod);
+
   return Response.json({
     ok: true,
     disegerakkan: rekod.length,
     statusPasukan: petaStatus.size,
+    jualanPulih: jualan,
     masa: now,
   });
+}
+
+/** Adakah status ini bermakna duit sudah masuk? */
+function sudahPulih(status: string | null): boolean {
+  const s = (status ?? "").toLowerCase();
+  if (!s) return false;
+  // Ditolak dahulu: "partially_refunded" mengandungi "refund" dan BUKAN pulih.
+  if (/(void|refund|cancel|lost|gagal|batal)/.test(s)) return false;
+  return /(paid|recover|won|pulih|berjaya|bayar|success)/.test(s);
+}
+
+/**
+ * Masukkan setiap kes yang berjaya dipulihkan sebagai jualan Maisarah.
+ *
+ * Kenapa menulis ke jadual `sales` dan bukan mengira di paparan: dengan
+ * cara ini ia terus muncul di SEMUA tempat yang sudah membaca jadual itu —
+ * leaderboard jualan, Dashboard Utama Maisarah, dan Laporan Mingguan PDF —
+ * tanpa perlu mengubah mana-mana satu.
+ *
+ * `source_ref` unik menghalang jualan berganda: penyegerakan boleh berjalan
+ * beratus kali, satu kes tetap satu baris jualan.
+ */
+async function catatJualanPulih(
+  admin: ReturnType<typeof createServiceClient>,
+  rekod: { source_id: string; amount_rm: number; status: string | null; contacted_at: string | null; customer_name: string | null }[]
+): Promise<{ dicatat: number; jumlahRm: number; nota?: string }> {
+  const pulih = rekod.filter((r) => sudahPulih(r.status) && r.amount_rm > 0);
+  if (pulih.length === 0) return { dicatat: 0, jumlahRm: 0 };
+
+  // Cari Maisarah. Kod handler diutamakan kerana nama boleh berubah ejaan.
+  const { data: mai } = await admin
+    .from("profiles")
+    .select("id, full_name")
+    .or("handler_code.eq.MAI,full_name.ilike.%maisarah%")
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle<{ id: string; full_name: string }>();
+
+  if (!mai) {
+    return {
+      dicatat: 0,
+      jumlahRm: 0,
+      nota:
+        "Jualan pulih tidak dicatat: akaun Maisarah tidak dijumpai (handler_code 'MAI' atau nama mengandungi 'maisarah').",
+    };
+  }
+
+  const hariIni = new Date().toISOString().slice(0, 10);
+
+  const { error } = await admin.from("sales").upsert(
+    pulih.map((r) => ({
+      source_ref: `recovery-${r.source_id}`,
+      user_id: mai.id,
+      date: r.contacted_at ?? hariIni,
+      amount_rm: r.amount_rm,
+      platform: "whatsapp" as const,
+      note: `Recovery: ${r.customer_name ?? "customer"}`,
+      created_by: mai.id,
+    })),
+    { onConflict: "source_ref" }
+  );
+
+  if (error) {
+    return {
+      dicatat: 0,
+      jumlahRm: 0,
+      nota: /source_ref/i.test(error.message)
+        ? "Lajur source_ref belum ada. Sila run add-recovery-to-sales.sql dalam Supabase."
+        : "Gagal mencatat jualan pulih: " + error.message,
+    };
+  }
+
+  return {
+    dicatat: pulih.length,
+    jumlahRm: pulih.reduce((s, r) => s + r.amount_rm, 0),
+  };
 }

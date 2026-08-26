@@ -149,8 +149,17 @@ export default function RecoveryPage() {
       const json = await res.json();
       if (json.ok) {
         if (json.dilangkau) setSyncMsg(json.sebab);
-        else if (json.disegerakkan)
-          setSyncMsg(`${json.disegerakkan} rekod ditarik dari CRM.`);
+        else if (json.disegerakkan) {
+          const jp = json.jualanPulih;
+          const tambahan = jp?.nota
+            ? ` ${jp.nota}`
+            : jp?.dicatat
+            ? ` ${jp.dicatat} jualan pulih dicatat untuk Maisarah (RM ${Number(
+                jp.jumlahRm
+              ).toLocaleString("ms-MY")}).`
+            : "";
+          setSyncMsg(`${json.disegerakkan} rekod ditarik dari CRM.${tambahan}`);
+        }
       } else {
         setSyncMsg(json.error ?? "Gagal menarik data dari CRM.");
       }
@@ -335,6 +344,9 @@ export default function RecoveryPage() {
               {lastSync.basi ? "⚠️ " : "✓ "}
               Data terakhir diterima dari CRM:{" "}
               <strong className="text-white">{lastSync.teks}</strong>
+              {syncMsg && (
+                <span className="ml-1 text-slate-400">· {syncMsg}</span>
+              )}
               {lastSync.basi && (
                 <span>
                   {" "}
