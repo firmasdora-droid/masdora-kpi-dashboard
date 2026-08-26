@@ -47,6 +47,47 @@ function rankLabel(rank: number): React.ReactNode {
   return MEDALS[rank - 1] ?? `#${rank}`;
 }
 
+/** Sasaran bulanan dipecah sama rata kepada 4 minggu. */
+const MINGGU_SEBULAN = 4;
+
+/**
+ * Berapa lagi diperlukan untuk mencapai sasaran.
+ *
+ * Bila sasaran sudah dilepasi, GAP dipaparkan sebagai lebihan dan bukan
+ * nombor negatif — "RM 0 lagi" mengelirukan bagi orang yang sudah menang.
+ */
+function GapSasaran({
+  capai,
+  sasaran,
+}: {
+  capai: number | null;
+  sasaran: number | null;
+}) {
+  if (!sasaran || sasaran <= 0) {
+    return <span className="text-slate-500">-</span>;
+  }
+
+  const baki = sasaran - (capai ?? 0);
+
+  if (baki <= 0) {
+    return (
+      <span className="font-bold text-masdora-olive">
+        ✓ Lebih {formatRM(Math.abs(baki))}
+      </span>
+    );
+  }
+
+  // Merah bila lebih separuh sasaran masih berbaki — perlu perhatian.
+  const kritikal = baki > sasaran * 0.5;
+  return (
+    <span
+      className={`font-bold ${kritikal ? "text-red-300" : "text-amber-200"}`}
+    >
+      {formatRM(baki)} lagi
+    </span>
+  );
+}
+
 export default function LeaderboardPage() {
   return (
     <div className="space-y-6">
@@ -235,17 +276,41 @@ function SalesWeekly() {
   });
   const [rows, setRows] = useState<VSalesRankWeekly[]>([]);
   const [loading, setLoading] = useState(true);
+  /** Sasaran & pencapaian BULANAN — untuk memaparkan GAP bulanan di sini. */
+  const [bulanan, setBulanan] = useState<
+    Map<string, { total: number; sasaran: number | null }>
+  >(new Map());
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("v_sales_rank_weekly")
-      .select("*")
-      .eq("year", week.year)
-      .eq("month", week.month)
-      .eq("week", week.week)
-      .order("rank");
+    const [{ data }, { data: bln }] = await Promise.all([
+      supabase
+        .from("v_sales_rank_weekly")
+        .select("*")
+        .eq("year", week.year)
+        .eq("month", week.month)
+        .eq("week", week.week)
+        .order("rank"),
+      // GAP yang paling bermakna ialah GAP ke sasaran BULANAN, jadi
+      // pencapaian sepanjang bulan diambil sekali walaupun paparan ini
+      // mingguan.
+      supabase
+        .from("v_sales_rank_monthly")
+        .select("user_id, total_rm, target_rm")
+        .eq("year", week.year)
+        .eq("month", week.month),
+    ]);
+
     setRows((data as VSalesRankWeekly[]) ?? []);
+    setBulanan(
+      new Map(
+        ((bln as { user_id: string; total_rm: number; target_rm: number | null }[]) ??
+          []).map((b) => [
+          b.user_id,
+          { total: b.total_rm ?? 0, sasaran: b.target_rm },
+        ])
+      )
+    );
     setLoading(false);
   }, [week, supabase]);
 
@@ -270,6 +335,39 @@ function SalesWeekly() {
       key: "total_rm",
       header: "Jumlah (RM)",
       render: (r) => formatRM(r.total_rm),
+    },
+    {
+      key: "target_minggu",
+      header: "Sasaran Minggu",
+      render: (r) => {
+        const s = bulanan.get(r.user_id)?.sasaran;
+        return s ? (
+          formatRM(s / MINGGU_SEBULAN)
+        ) : (
+          <span className="text-slate-500">-</span>
+        );
+      },
+    },
+    {
+      key: "gap_minggu",
+      header: "GAP Minggu",
+      render: (r) => {
+        const s = bulanan.get(r.user_id)?.sasaran;
+        return (
+          <GapSasaran
+            capai={r.total_rm}
+            sasaran={s ? s / MINGGU_SEBULAN : null}
+          />
+        );
+      },
+    },
+    {
+      key: "gap_bulan",
+      header: "GAP Bulan",
+      render: (r) => {
+        const b = bulanan.get(r.user_id);
+        return <GapSasaran capai={b?.total ?? 0} sasaran={b?.sasaran ?? null} />;
+      },
     },
     { key: "entries", header: "Bilangan Rekod" },
   ];
@@ -362,6 +460,11 @@ function SalesMonthly() {
         const { label, pill } = pctPill(r.pct_target);
         return <span className={`pill pill-${pill}`}>{label}</span>;
       },
+    },
+    {
+      key: "gap",
+      header: "GAP ke Sasaran",
+      render: (r) => <GapSasaran capai={r.total_rm} sasaran={r.target_rm} />,
     },
     { key: "entries", header: "Bilangan Rekod" },
   ];
