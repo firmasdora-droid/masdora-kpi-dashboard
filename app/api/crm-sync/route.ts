@@ -261,6 +261,10 @@ export async function GET(request: Request) {
   }
 
   const now = new Date().toISOString();
+  // Nota: `team_status` / `team_note` TIDAK disenaraikan di sini. ON CONFLICT
+  // hanya mengemas kini lajur yang diberi, jadi status yang ditandakan oleh
+  // pasukan dalam dashboard kekal walaupun penyegerakan berjalan berulang
+  // kali.
   const { error } = await admin.from("recovery_records").upsert(
     rekod.map((r) => ({
       source_id: r.source_id,
