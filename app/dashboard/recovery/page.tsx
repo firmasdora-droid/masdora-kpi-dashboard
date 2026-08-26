@@ -38,6 +38,8 @@ interface DiagnosisCrm {
     tableCount: number;
     jsonEmbedded: boolean;
     jsonCebisan: string | null;
+    statusCebisan?: string[];
+    endpoints?: string[];
     sample: string[][];
   };
   error?: string;
@@ -251,6 +253,14 @@ export default function RecoveryPage() {
               ? "Memuatkan..."
               : "Tarik Data CRM"}
           </button>
+          <button
+            onClick={periksa}
+            disabled={checking}
+            className="btn-secondary"
+            title="Lihat apa yang pelayan CRM sebenarnya balas"
+          >
+            {checking ? "Memeriksa..." : "Periksa"}
+          </button>
           <a
             href={CRM_URL}
             target="_blank"
@@ -385,6 +395,35 @@ export default function RecoveryPage() {
                 masuk {diagnosis.jejak?.masihBorangLogMasuk ? "masih ada" : "tiada"}
                 {diagnosis.struktur?.jsonEmbedded ? " · ada JSON terbenam" : ""}
               </p>
+              {(diagnosis.struktur?.endpoints?.length ?? 0) > 0 && (
+                <div>
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    URL yang dipanggil oleh CRM
+                  </p>
+                  <p className="font-mono text-[11px] text-slate-300">
+                    {diagnosis.struktur!.endpoints!.join(" · ")}
+                  </p>
+                </div>
+              )}
+
+              {(diagnosis.struktur?.statusCebisan?.length ?? 0) > 0 && (
+                <div>
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Di mana status team disimpan
+                  </p>
+                  <div className="max-h-48 space-y-1 overflow-auto">
+                    {diagnosis.struktur!.statusCebisan!.map((c, i) => (
+                      <p
+                        key={i}
+                        className="rounded border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-relaxed text-slate-300"
+                      >
+                        {c}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <p className="text-[11px] text-amber-200">
                 Hantar tangkapan skrin kotak ini kepada saya — ia cukup untuk
                 saya tahu langkah seterusnya.

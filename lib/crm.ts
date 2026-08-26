@@ -43,6 +43,17 @@ export interface CrmDebug {
   jsonEmbedded: boolean;
   /** Cebisan JSON pertama yang dijumpai, kalau data bukan dalam jadual. */
   jsonCebisan: string | null;
+  /**
+   * Cebisan di sekeliling perkataan status CRM (contacted/recovered/lost).
+   * Status yang Maisarah tetapkan disimpan berasingan daripada data
+   * Shopify — ini membantu mencarinya.
+   */
+  statusCebisan: string[];
+  /**
+   * URL yang dipanggil oleh JavaScript halaman. Kalau status diambil dari
+   * endpoint berasingan, ia akan kelihatan di sini.
+   */
+  endpoints: string[];
   /** 3 baris pertama, mentah — untuk menyelaraskan pembaca. */
   sample: string[][];
 }
@@ -262,12 +273,38 @@ export function periksaStruktur(html: string): CrmDebug {
     }
   }
 
+  // Cari di mana status CRM (yang ditetapkan oleh Maisarah) disimpan.
+  const statusCebisan: string[] = [];
+  const kataStatus = /"?(recovered|contacted|lost)"?/gi;
+  let sm: RegExpExecArray | null;
+  while ((sm = kataStatus.exec(html)) !== null && statusCebisan.length < 4) {
+    const mula = Math.max(0, sm.index - 220);
+    const petikan = html.slice(mula, sm.index + 220).replace(/\s+/g, " ");
+    // Abaikan padanan dalam teks paparan (butang penapis, tajuk).
+    if (/[{[:,]/.test(petikan)) statusCebisan.push(petikan);
+  }
+
+  // Kutip URL yang dipanggil oleh JavaScript halaman.
+  const endpoints = Array.from(
+    new Set(
+      [
+        ...(html.match(/fetch\(\s*[`'"]([^`'"]+)[`'"]/g) ?? []).map((x) =>
+          x.replace(/^fetch\(\s*[`'"]/, "")
+        ),
+        ...(html.match(/["'`](\/(?:api|team|data)\/[^"'`\s]{2,80})["'`]/g) ?? [])
+          .map((x) => x.slice(1, -1)),
+      ].filter(Boolean)
+    )
+  ).slice(0, 12);
+
   return {
     headers: rows[0] ?? [],
     rowCount: Math.max(0, rows.length - 1),
     tableCount: tables.length,
     jsonEmbedded: jsonCebisan !== null,
     jsonCebisan,
+    statusCebisan,
+    endpoints,
     sample: rows.slice(1, 4),
   };
 }
