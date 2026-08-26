@@ -16,26 +16,7 @@ interface RecoveryRecord {
   handler_code: string | null;
   note: string | null;
   updated_at: string;
-  /**
-   * Status yang ditandakan oleh pasukan DALAM dashboard.
-   *
-   * Disimpan berasingan daripada `status` supaya penyegerakan automatik
-   * dari CRM tidak menimpanya. "Sudah dihubungi" ialah fakta yang hanya
-   * manusia tahu — tiada sistem boleh mengiranya sendiri.
-   */
-  team_status?: string | null;
-  team_note?: string | null;
-  team_updated_at?: string | null;
 }
-
-/** Status yang boleh ditandakan oleh pasukan. */
-const PILIHAN_STATUS = [
-  { nilai: "", label: "— ikut CRM —" },
-  { nilai: "open", label: "Belum dihubungi" },
-  { nilai: "contacted", label: "Sudah dihubungi" },
-  { nilai: "recovered", label: "Berjaya pulih" },
-  { nilai: "lost", label: "Tidak berjaya" },
-];
 
 const CRM_URL = "https://masdora.zo.space/team/recovery-crm";
 
@@ -121,12 +102,12 @@ function tierOf(status: string | null): Tier {
 /**
  * Status berkesan bagi satu kes.
  *
- * Status yang ditandakan dalam dashboard diutamakan, kerana itulah
- * tindakan manusia yang paling terkini. Status CRM/Shopify jadi sandaran
- * untuk kes yang belum disentuh sesiapa.
+ * CRM ialah satu-satunya sumber status — Maisarah kemas kini di sana
+ * sahaja, dan dashboard ikut. Lajur `team_status` yang lama sengaja
+ * DIABAIKAN supaya nilai lama tidak menimpa apa yang CRM katakan.
  */
 function statusBerkesan(r: RecoveryRecord): string | null {
-  return r.team_status || r.status;
+  return r.status;
 }
 
 function formatRM(n: number | string | null | undefined): string {
@@ -191,48 +172,6 @@ export default function RecoveryPage() {
     }
     setChecking(false);
   }, []);
-
-  /**
-   * Tandakan status satu kes.
-   *
-   * Disimpan ke `team_status`, bukan `status` — supaya penyegerakan
-   * automatik dari CRM tidak menimpanya. Paparan dikemas kini serta-merta
-   * supaya dropdown tidak berkelip menunggu pelayan.
-   */
-  const tandaStatus = useCallback(
-    async (rec: RecoveryRecord, nilai: string) => {
-      setRecords((sebelum) =>
-        sebelum.map((x) =>
-          x.id === rec.id ? { ...x, team_status: nilai || null } : x
-        )
-      );
-
-      const { error: uErr } = await supabase
-        .from("recovery_records")
-        .update({
-          team_status: nilai || null,
-          team_updated_at: new Date().toISOString(),
-        })
-        .eq("id", rec.id);
-
-      if (uErr) {
-        // Balikkan paparan supaya ia tidak menipu.
-        setRecords((sebelum) =>
-          sebelum.map((x) =>
-            x.id === rec.id ? { ...x, team_status: rec.team_status ?? null } : x
-          )
-        );
-        setError(
-          /team_status|column/i.test(uErr.message)
-            ? "Lajur status pasukan belum ada. Sila run fail add-recovery-team-status.sql dalam Supabase SQL Editor."
-            : "Gagal menyimpan status: " + uErr.message
-        );
-      } else {
-        setError(null);
-      }
-    },
-    [supabase]
-  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -642,7 +581,6 @@ export default function RecoveryPage() {
                 <th>Customer</th>
                 <th>Hubungan</th>
                 <th>Status</th>
-                <th>Tandakan</th>
                 <th>Jumlah (RM)</th>
                 <th>Catatan</th>
               </tr>
@@ -661,21 +599,6 @@ export default function RecoveryPage() {
                       <span className={`pill ${tier.pill}`}>
                         {tier.icon} {statusBerkesan(r) || tier.label}
                       </span>
-                    </td>
-                    <td>
-                      {/* Menandakan di sini kerana "sudah dihubungi" ialah
-                          fakta yang hanya manusia tahu. */}
-                      <select
-                        className="input py-1 text-xs"
-                        value={r.team_status ?? ""}
-                        onChange={(e) => tandaStatus(r, e.target.value)}
-                      >
-                        {PILIHAN_STATUS.map((p) => (
-                          <option key={p.nilai} value={p.nilai}>
-                            {p.label}
-                          </option>
-                        ))}
-                      </select>
                     </td>
                     <td className="font-bold text-brand-400">
                       {Number(r.amount_rm ?? 0) > 0 ? formatRM(r.amount_rm) : "—"}
