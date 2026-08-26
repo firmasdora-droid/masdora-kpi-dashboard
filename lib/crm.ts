@@ -254,6 +254,46 @@ export async function ambilHalamanCrm(kataLaluan: string): Promise<HasilCrm> {
   };
 }
 
+/**
+ * Cuba satu alamat dalam CRM menggunakan sesi yang sama.
+ *
+ * Digunakan untuk mencari dari mana status pasukan diambil, tanpa perlu
+ * meneka dan menunggu satu pusingan penuh setiap kali.
+ */
+export async function cubaAlamat(
+  kataLaluan: string,
+  laluan: string
+): Promise<{ url: string; status: number; jenis: string; cebisan: string }> {
+  const kepala = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "User-Agent": "Mozilla/5.0 (compatible; MasdoraDashboard/1.0)",
+  };
+
+  // Log masuk semula untuk mendapatkan cookie sesi.
+  const post = await fetch(CRM_URL, {
+    method: "POST",
+    headers: kepala,
+    body: new URLSearchParams({ pw: kataLaluan }).toString(),
+    redirect: "manual",
+    cache: "no-store",
+  });
+  const cookie = kutipCookie(post);
+
+  const url = new URL(laluan, CRM_URL).toString();
+  const res = await fetch(url, {
+    headers: { ...kepala, Cookie: cookie, Accept: "application/json, */*" },
+    cache: "no-store",
+  });
+  const teks = await res.text();
+
+  return {
+    url,
+    status: res.status,
+    jenis: res.headers.get("content-type") ?? "",
+    cebisan: teks.slice(0, 1200),
+  };
+}
+
 /** Periksa struktur halaman tanpa menyimpan apa-apa. */
 export function periksaStruktur(html: string): CrmDebug {
   const tables = html.match(/<table[\s\S]*?<\/table>/gi) ?? [];
@@ -273,29 +313,54 @@ export function periksaStruktur(html: string): CrmDebug {
     }
   }
 
-  // Cari di mana status CRM (yang ditetapkan oleh Maisarah) disimpan.
+  // CSS dan pilihan penapis turut mengandungi perkataan status, tetapi ia
+  // bukan data. Buang dahulu supaya carian tidak dipenuhi bunyi.
+  const bersih = html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<option[\s\S]*?<\/option>/gi, " ")
+    .replace(/<link[^>]*>/gi, " ");
+
+  // Cari pasangan status dalam bentuk data sebenar, contoh "status":"recovered"
   const statusCebisan: string[] = [];
-  const kataStatus = /"?(recovered|contacted|lost)"?/gi;
-  let sm: RegExpExecArray | null;
-  while ((sm = kataStatus.exec(html)) !== null && statusCebisan.length < 4) {
-    const mula = Math.max(0, sm.index - 220);
-    const petikan = html.slice(mula, sm.index + 220).replace(/\s+/g, " ");
-    // Abaikan padanan dalam teks paparan (butang penapis, tajuk).
-    if (/[{[:,]/.test(petikan)) statusCebisan.push(petikan);
+  const corak = [
+    /["']?status["']?\s*[:=]\s*["'](open|contacted|recovered|lost)["']/gi,
+    /["'](open|contacted|recovered|lost)["']\s*[,}\]]/gi,
+    /s-(open|contacted|recovered|lost)\b/gi,
+  ];
+  for (const c of corak) {
+    let sm: RegExpExecArray | null;
+    while ((sm = c.exec(bersih)) !== null && statusCebisan.length < 6) {
+      const mula = Math.max(0, sm.index - 260);
+      statusCebisan.push(
+        bersih.slice(mula, sm.index + 260).replace(/\s+/g, " ")
+      );
+    }
+    if (statusCebisan.length >= 6) break;
   }
 
-  // Kutip URL yang dipanggil oleh JavaScript halaman.
+  // Kutip SEMUA alamat yang disebut dalam skrip halaman — bukan hanya
+  // corak fetch() yang jelas, kerana alamat boleh dibina secara dinamik.
+  const skripSahaja = (html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) ?? [])
+    .join(" ")
+    .replace(/\\\//g, "/");
+
   const endpoints = Array.from(
     new Set(
-      [
-        ...(html.match(/fetch\(\s*[`'"]([^`'"]+)[`'"]/g) ?? []).map((x) =>
-          x.replace(/^fetch\(\s*[`'"]/, "")
-        ),
-        ...(html.match(/["'`](\/(?:api|team|data)\/[^"'`\s]{2,80})["'`]/g) ?? [])
-          .map((x) => x.slice(1, -1)),
-      ].filter(Boolean)
+      (
+        skripSahaja.match(
+          /["'`](https?:\/\/[^"'`\s]{4,90}|\/[A-Za-z0-9_\-./]{2,80})["'`]/g
+        ) ?? []
+      )
+        .map((x) => x.slice(1, -1))
+        // Buang aset — gambar produk, fon, skrip pihak ketiga.
+        .filter(
+          (u) =>
+            !/\.(png|jpe?g|gif|svg|webp|css|woff2?|ttf|ico)(\?|$)/i.test(u) &&
+            !/cdn\.shopify\.com/i.test(u) &&
+            !/fonts\.(googleapis|gstatic)/i.test(u)
+        )
     )
-  ).slice(0, 12);
+  ).slice(0, 20);
 
   return {
     headers: rows[0] ?? [],

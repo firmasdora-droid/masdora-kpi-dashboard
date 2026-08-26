@@ -19,7 +19,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { ambilHalamanCrm, bacaRekod, periksaStruktur } from "@/lib/crm";
+import {
+  ambilHalamanCrm,
+  bacaRekod,
+  cubaAlamat,
+  periksaStruktur,
+} from "@/lib/crm";
 
 /** Jangan tarik lebih kerap daripada ini bila halaman dibuka. */
 const COOLDOWN_MINIT = 5;
@@ -107,6 +112,35 @@ export async function GET(request: Request) {
           sebab: `Baru disegerakkan ${Math.round(minitLalu)} minit lalu.`,
         });
       }
+    }
+  }
+
+  // Mod cuba-alamat: uji satu laluan CRM menggunakan sesi yang sama.
+  // Manager/CEO sahaja kerana balasannya boleh mengandungi data customer.
+  const cuba = url.searchParams.get("cuba");
+  if (cuba) {
+    if (!auth.manager) {
+      return Response.json(
+        { ok: false, error: "Mod ini untuk manager & CEO sahaja." },
+        { status: 403 }
+      );
+    }
+    if (!/^\/[A-Za-z0-9_\-./?=&]{1,120}$/.test(cuba)) {
+      return Response.json(
+        { ok: false, error: "Laluan tidak sah." },
+        { status: 400 }
+      );
+    }
+    try {
+      return Response.json({
+        ok: true,
+        cubaan: await cubaAlamat(process.env.CRM_TEAM_PASSWORD, cuba),
+      });
+    } catch (e) {
+      return Response.json(
+        { ok: false, error: e instanceof Error ? e.message : "Gagal." },
+        { status: 502 }
+      );
     }
   }
 
