@@ -51,6 +51,45 @@ function rankLabel(rank: number): React.ReactNode {
 const MINGGU_SEBULAN = 4;
 
 /**
+ * Sasaran jualan lalai: RM100,000 sebulan.
+ *
+ * Ditetapkan dalam kod supaya angka Sasaran, % Sasaran dan GAP terus
+ * kelihatan tanpa perlu memasukkan apa-apa ke database. Kalau sasaran
+ * khusus DIADA dalam jadual `sales_targets`, nilai itu mengatasi lalai ini —
+ * jadi sasaran individu masih boleh diubah tanpa menyentuh kod.
+ */
+const SASARAN_LALAI_RM = 100_000;
+
+/** Jawatan yang mempunyai sasaran jualan: semua CS + videographer produk. */
+const JAWATAN_BERSASARAN = [
+  "CS_AGENT",
+  "CS_WEB",
+  "CS_SHOPEE",
+  "CS_TIKTOK",
+  "VID_PROD",
+];
+
+/** Sasaran berkesan bagi seseorang. */
+function sasaranUntuk(
+  sasaranDb: number | null | undefined,
+  positionCode: string | null | undefined
+): number | null {
+  if (sasaranDb && sasaranDb > 0) return sasaranDb;
+  if (positionCode && JAWATAN_BERSASARAN.includes(positionCode)) {
+    return SASARAN_LALAI_RM;
+  }
+  return null;
+}
+
+function peratusSasaran(
+  capai: number | null,
+  sasaran: number | null
+): number | null {
+  if (!sasaran || sasaran <= 0) return null;
+  return Math.round(((capai ?? 0) / sasaran) * 1000) / 10;
+}
+
+/**
  * Berapa lagi diperlukan untuk mencapai sasaran.
  *
  * Bila sasaran sudah dilepasi, GAP dipaparkan sebagai lebihan dan bukan
@@ -280,10 +319,17 @@ function SalesWeekly() {
   const [bulanan, setBulanan] = useState<
     Map<string, { total: number; sasaran: number | null }>
   >(new Map());
+  /**
+   * Jawatan diperlukan berasingan kerana seseorang mungkin ada jualan
+   * mingguan tetapi belum muncul dalam ringkasan bulanan.
+   */
+  const [jawatanMinggu, setJawatanMinggu] = useState<
+    Map<string, string | null>
+  >(new Map());
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data }, { data: bln }] = await Promise.all([
+    const [{ data }, { data: bln }, { data: prof }] = await Promise.all([
       supabase
         .from("v_sales_rank_weekly")
         .select("*")
@@ -299,18 +345,30 @@ function SalesWeekly() {
         .select("user_id, total_rm, target_rm")
         .eq("year", week.year)
         .eq("month", week.month),
+      supabase.from("profiles").select("id, position_code"),
     ]);
 
     setRows((data as VSalesRankWeekly[]) ?? []);
+
+    const petaJawatan = new Map(
+      ((prof as { id: string; position_code: string | null }[]) ?? []).map(
+        (p) => [p.id, p.position_code]
+      )
+    );
+
     setBulanan(
       new Map(
         ((bln as { user_id: string; total_rm: number; target_rm: number | null }[]) ??
           []).map((b) => [
           b.user_id,
-          { total: b.total_rm ?? 0, sasaran: b.target_rm },
+          {
+            total: b.total_rm ?? 0,
+            sasaran: sasaranUntuk(b.target_rm, petaJawatan.get(b.user_id)),
+          },
         ])
       )
     );
+    setJawatanMinggu(petaJawatan);
     setLoading(false);
   }, [week, supabase]);
 
@@ -340,7 +398,9 @@ function SalesWeekly() {
       key: "target_minggu",
       header: "Sasaran Minggu",
       render: (r) => {
-        const s = bulanan.get(r.user_id)?.sasaran;
+        const s =
+          bulanan.get(r.user_id)?.sasaran ??
+          sasaranUntuk(null, jawatanMinggu.get(r.user_id));
         return s ? (
           formatRM(s / MINGGU_SEBULAN)
         ) : (
@@ -349,10 +409,25 @@ function SalesWeekly() {
       },
     },
     {
+      key: "pct_minggu",
+      header: "% Sasaran Minggu",
+      render: (r) => {
+        const s =
+          bulanan.get(r.user_id)?.sasaran ??
+          sasaranUntuk(null, jawatanMinggu.get(r.user_id));
+        const { label, pill } = pctPill(
+          peratusSasaran(r.total_rm, s ? s / MINGGU_SEBULAN : null)
+        );
+        return <span className={`pill pill-${pill}`}>{label}</span>;
+      },
+    },
+    {
       key: "gap_minggu",
       header: "GAP Minggu",
       render: (r) => {
-        const s = bulanan.get(r.user_id)?.sasaran;
+        const s =
+          bulanan.get(r.user_id)?.sasaran ??
+          sasaranUntuk(null, jawatanMinggu.get(r.user_id));
         return (
           <GapSasaran
             capai={r.total_rm}
@@ -411,16 +486,28 @@ function SalesMonthly() {
   const [month, setMonth] = useState(getCurrentMonth());
   const [rows, setRows] = useState<VSalesRankMonthly[]>([]);
   const [loading, setLoading] = useState(true);
+  /** user_id -> position_code, untuk menentukan siapa ada sasaran jualan. */
+  const [jawatan, setJawatan] = useState<Map<string, string | null>>(new Map());
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("v_sales_rank_monthly")
-      .select("*")
-      .eq("year", year)
-      .eq("month", month)
-      .order("rank");
+    const [{ data }, { data: prof }] = await Promise.all([
+      supabase
+        .from("v_sales_rank_monthly")
+        .select("*")
+        .eq("year", year)
+        .eq("month", month)
+        .order("rank"),
+      supabase.from("profiles").select("id, position_code"),
+    ]);
     setRows((data as VSalesRankMonthly[]) ?? []);
+    setJawatan(
+      new Map(
+        ((prof as { id: string; position_code: string | null }[]) ?? []).map(
+          (p) => [p.id, p.position_code]
+        )
+      )
+    );
     setLoading(false);
   }, [year, month, supabase]);
 
@@ -451,20 +538,30 @@ function SalesMonthly() {
     {
       key: "target_rm",
       header: "Sasaran (RM)",
-      render: (r) => formatRM(r.target_rm),
+      render: (r) => formatRM(sasaranUntuk(r.target_rm, jawatan.get(r.user_id))),
     },
     {
       key: "pct_target",
       header: "% Sasaran",
       render: (r) => {
-        const { label, pill } = pctPill(r.pct_target);
+        const { label, pill } = pctPill(
+          peratusSasaran(
+            r.total_rm,
+            sasaranUntuk(r.target_rm, jawatan.get(r.user_id))
+          )
+        );
         return <span className={`pill pill-${pill}`}>{label}</span>;
       },
     },
     {
       key: "gap",
       header: "GAP ke Sasaran",
-      render: (r) => <GapSasaran capai={r.total_rm} sasaran={r.target_rm} />,
+      render: (r) => (
+        <GapSasaran
+          capai={r.total_rm}
+          sasaran={sasaranUntuk(r.target_rm, jawatan.get(r.user_id))}
+        />
+      ),
     },
     { key: "entries", header: "Bilangan Rekod" },
   ];
