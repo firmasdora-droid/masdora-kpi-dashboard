@@ -21,8 +21,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   ambilHalamanCrm,
+  ambilStatusPasukan,
   bacaRekod,
   cubaAlamat,
+  gabungStatus,
   periksaStruktur,
 } from "@/lib/crm";
 
@@ -168,11 +170,19 @@ export async function GET(request: Request) {
         { status: 403 }
       );
     }
+    let bilStatus = 0;
+    try {
+      bilStatus = (await ambilStatusPasukan(hasil.cookie)).size;
+    } catch {
+      // diabaikan — bahagian lain diagnosis masih berguna
+    }
+
     return Response.json({
       ok: true,
       logMasukBerjaya: hasil.berjaya,
       // Berapa rekod yang BOLEH dibaca — angka yang paling penting.
       rekodDikenali: bacaRekod(hasil.html).length,
+      statusPasukan: bilStatus,
       jejak: hasil.jejak,
       struktur: periksaStruktur(hasil.html),
     });
@@ -192,7 +202,17 @@ export async function GET(request: Request) {
 
   const html = hasil.html;
 
-  const rekod = bacaRekod(html);
+  // Status pasukan (Open/Contacted/Recovered/Lost) datang dari endpoint
+  // berasingan. Kalau ia gagal, kes tetap disimpan dengan status Shopify —
+  // lebih baik daripada tiada data langsung.
+  let petaStatus = new Map<string, { status: string | null; note: string | null }>();
+  try {
+    petaStatus = await ambilStatusPasukan(hasil.cookie);
+  } catch {
+    // diabaikan dengan sengaja
+  }
+
+  const rekod = gabungStatus(bacaRekod(html), petaStatus);
 
   if (rekod.length === 0) {
     return Response.json(
@@ -231,5 +251,10 @@ export async function GET(request: Request) {
     );
   }
 
-  return Response.json({ ok: true, disegerakkan: rekod.length, masa: now });
+  return Response.json({
+    ok: true,
+    disegerakkan: rekod.length,
+    statusPasukan: petaStatus.size,
+    masa: now,
+  });
 }

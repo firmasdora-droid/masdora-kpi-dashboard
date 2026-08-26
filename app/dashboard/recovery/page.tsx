@@ -23,6 +23,7 @@ const CRM_URL = "https://masdora.zo.space/team/recovery-crm";
 interface DiagnosisCrm {
   logMasukBerjaya?: boolean;
   rekodDikenali?: number;
+  statusPasukan?: number;
   jejak?: {
     statusPost: number;
     adaCookie: boolean;
@@ -356,9 +357,9 @@ export default function RecoveryPage() {
                   baik={(diagnosis.rekodDikenali ?? 0) > 0}
                 />
                 <Fakta
-                  label="Baris data"
-                  nilai={String(diagnosis.struktur?.rowCount ?? 0)}
-                  baik={(diagnosis.struktur?.rowCount ?? 0) > 0}
+                  label="Status pasukan"
+                  nilai={String(diagnosis.statusPasukan ?? 0)}
+                  baik={(diagnosis.statusPasukan ?? 0) > 0}
                 />
                 <Fakta
                   label="Saiz halaman"

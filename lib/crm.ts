@@ -17,6 +17,16 @@
 
 export const CRM_URL = "https://masdora.zo.space/team/recovery-crm";
 
+/**
+ * Status & catatan yang ditetapkan oleh pasukan (Open / Contacted /
+ * Recovered / Lost) disimpan berasingan daripada data Shopify.
+ *
+ * Kod CRM sendiri menjelaskannya: "When hosted on Zo (or any server
+ * exposing /api/masdora-status), statuses & notes are shared across the
+ * whole team."
+ */
+export const CRM_STATUS_URL = "https://masdora.zo.space/api/masdora-status";
+
 export interface CrmRow {
   source_id: string;
   customer_name: string | null;
@@ -144,6 +154,13 @@ export interface HasilCrm {
   html: string;
   jejak: JejakLogMasuk;
   berjaya: boolean;
+  /** Cookie sesi — diguna semula untuk mengambil status pasukan. */
+  cookie: string;
+}
+
+export interface StatusPasukan {
+  status: string | null;
+  note: string | null;
 }
 
 /** Ambil semua nilai Set-Cookie dan gabungkan menjadi satu header Cookie. */
@@ -235,6 +252,7 @@ export async function ambilHalamanCrm(kataLaluan: string): Promise<HasilCrm> {
 
   return {
     html,
+    cookie,
     berjaya: !ditolak,
     jejak: {
       statusPost: post.status,
@@ -252,6 +270,98 @@ export async function ambilHalamanCrm(kataLaluan: string): Promise<HasilCrm> {
         .slice(0, 600),
     },
   };
+}
+
+/** Buang segala kecuali digit — untuk memadankan ID dari sumber berbeza. */
+function kunciId(v: unknown): string {
+  const s = String(v ?? "");
+  const digit = s.match(/(\d{4,})/g);
+  return digit ? digit[digit.length - 1] : "";
+}
+
+/**
+ * Ambil status & catatan yang ditetapkan pasukan dari /api/masdora-status.
+ *
+ * Bentuk balasan tidak dijamin, jadi tiga bentuk lazim diterima:
+ *   { "<id>": { status, note } }
+ *   { overrides: { "<id>": { status, note } } }
+ *   [ { id, status, note } ]
+ *
+ * Kunci dinormalkan kepada digit sahaja, kerana CRM mungkin menggunakan
+ * gid Shopify penuh manakala rekod kita menyimpan nombor sahaja.
+ */
+export async function ambilStatusPasukan(
+  cookie: string
+): Promise<Map<string, StatusPasukan>> {
+  const peta = new Map<string, StatusPasukan>();
+
+  const res = await fetch(CRM_STATUS_URL, {
+    headers: {
+      Cookie: cookie,
+      Accept: "application/json",
+      "User-Agent": "Mozilla/5.0 (compatible; MasdoraDashboard/1.0)",
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) return peta;
+
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    return peta;
+  }
+
+  const simpan = (id: unknown, nilai: unknown) => {
+    const k = kunciId(id);
+    if (!k || typeof nilai !== "object" || nilai === null) return;
+    const v = nilai as { status?: unknown; note?: unknown };
+    peta.set(k, {
+      status: v.status ? String(v.status) : null,
+      note: v.note ? String(v.note) : null,
+    });
+  };
+
+  if (Array.isArray(data)) {
+    data.forEach((row) => {
+      const r = row as { id?: unknown; status?: unknown; note?: unknown };
+      simpan(r?.id, r);
+    });
+  } else if (typeof data === "object" && data !== null) {
+    const obj = data as Record<string, unknown>;
+    const isi =
+      (obj.overrides as Record<string, unknown> | undefined) ??
+      (obj.statuses as Record<string, unknown> | undefined) ??
+      obj;
+    Object.entries(isi).forEach(([k, v]) => simpan(k, v));
+  }
+
+  return peta;
+}
+
+/**
+ * Gabungkan status pasukan ke dalam rekod.
+ *
+ * Status CRM mengatasi status Shopify, kerana itulah keputusan sebenar
+ * yang dibuat oleh Maisarah. Status Shopify dikekalkan sebagai sandaran
+ * bagi kes yang belum disentuh sesiapa.
+ */
+export function gabungStatus(
+  rekod: CrmRow[],
+  peta: Map<string, StatusPasukan>
+): CrmRow[] {
+  if (peta.size === 0) return rekod;
+
+  return rekod.map((r) => {
+    const s = peta.get(kunciId(r.source_id));
+    if (!s) return r;
+    return {
+      ...r,
+      status: s.status ?? r.status,
+      note: [s.note, r.note].filter(Boolean).join(" — ") || null,
+    };
+  });
 }
 
 /**
