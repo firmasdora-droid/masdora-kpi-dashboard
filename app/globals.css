@@ -173,3 +173,28 @@ body {
     background: #ffffff !important;
   }
 }
+
+/* Seksyen yang HANYA muncul semasa cetakan — tersembunyi di skrin. */
+.cetak-sahaja {
+  display: none;
+}
+
+@media print {
+  .cetak-sahaja {
+    display: block !important;
+  }
+
+  /* Jangan potong satu baris jadual di tengah halaman, dan ulang tajuk
+     lajur pada setiap halaman supaya laporan panjang kekal boleh dibaca. */
+  #laporan-cetak table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  #laporan-cetak thead {
+    display: table-header-group;
+  }
+  #laporan-cetak tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

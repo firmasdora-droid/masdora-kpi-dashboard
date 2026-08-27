@@ -298,6 +298,14 @@ export default function RecoveryPage() {
           >
             Buka CRM
           </a>
+          <button
+            onClick={() => window.print()}
+            className="btn-primary"
+            disabled={loading || records.length === 0}
+            title="Cetak atau simpan sebagai PDF"
+          >
+            Simpan PDF
+          </button>
         </div>
       </div>
 
@@ -625,6 +633,119 @@ export default function RecoveryPage() {
           </table>
         </motion.div>
       )}
+
+      {/* ================= LAPORAN CETAK / PDF =================
+          Tersembunyi di skrin, muncul hanya semasa cetakan. Dipapar atas
+          kertas putih supaya PDF kelihatan seperti dokumen sebenar dan
+          tidak membazir dakwat. Ia mengikut tapisan semasa — jadi kamu
+          boleh cetak hanya "Berjaya Pulih" kalau perlu. */}
+      <div
+        id="laporan-cetak"
+        className="cetak-sahaja cetak-warna bg-white p-8 text-[11px] text-slate-800"
+        style={{ colorScheme: "light" }}
+      >
+        <div className="flex items-start justify-between border-b-2 border-[#F26122] pb-3">
+          <div>
+            <p className="text-lg font-black tracking-tight text-[#F26122]">
+              MASDORA
+            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+              Laporan Recovery CRM
+            </p>
+          </div>
+          <div className="text-right text-[10px] text-slate-600">
+            <p className="text-sm font-black text-slate-900">
+              {filtered.length.toLocaleString("ms-MY")} kes
+            </p>
+            {tierFilter && (
+              <p>Tapisan: {TIER_MAP[tierFilter]?.label ?? tierFilter}</p>
+            )}
+            {search.trim() && <p>Carian: {search.trim()}</p>}
+            <p>Dijana: {new Date().toLocaleString("ms-MY")}</p>
+            {lastSync && <p>Data CRM: {lastSync.teks}</p>}
+          </div>
+        </div>
+
+        {/* Ringkasan angka */}
+        <div className="mt-4 grid grid-cols-5 gap-2">
+          {[
+            { label: "Jumlah Kes", nilai: filtered.length.toLocaleString("ms-MY") },
+            { label: "Baru", nilai: counts.baru.toLocaleString("ms-MY") },
+            {
+              label: "Sedang Dihubungi",
+              nilai: counts.proses.toLocaleString("ms-MY"),
+            },
+            { label: "Berjaya Pulih", nilai: counts.pulih.toLocaleString("ms-MY") },
+            { label: "Tidak Berjaya", nilai: counts.gagal.toLocaleString("ms-MY") },
+          ].map((k) => (
+            <div
+              key={k.label}
+              className="cetak-warna rounded border border-slate-200 bg-slate-50 p-2"
+            >
+              <p className="text-[8px] font-bold uppercase tracking-wider text-slate-500">
+                {k.label}
+              </p>
+              <p className="text-sm font-black text-slate-900">{k.nilai}</p>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-2 text-[11px] font-bold text-slate-700">
+          Jualan pulih: {formatRM(totalRecovered)}
+        </p>
+
+        {/* Jadual penuh */}
+        <table className="mt-4 w-full border-collapse text-[9px]">
+          <thead>
+            <tr className="cetak-warna bg-slate-100">
+              {["Tarikh", "Customer", "Hubungan", "Status", "RM", "Catatan"].map(
+                (h) => (
+                  <th
+                    key={h}
+                    className="border border-slate-300 px-1.5 py-1 text-left font-bold text-slate-700"
+                  >
+                    {h}
+                  </th>
+                )
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.id}>
+                <td className="border border-slate-200 px-1.5 py-1">
+                  {r.contacted_at ?? "—"}
+                </td>
+                <td className="border border-slate-200 px-1.5 py-1 font-semibold">
+                  {r.customer_name ?? "—"}
+                </td>
+                <td className="border border-slate-200 px-1.5 py-1">
+                  {r.customer_contact ?? "—"}
+                </td>
+                <td className="border border-slate-200 px-1.5 py-1">
+                  {statusBerkesan(r) ?? "—"}
+                </td>
+                <td className="border border-slate-200 px-1.5 py-1 text-right font-bold">
+                  {Number(r.amount_rm ?? 0) > 0
+                    ? Number(r.amount_rm).toLocaleString("ms-MY", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : "—"}
+                </td>
+                <td className="border border-slate-200 px-1.5 py-1">
+                  {r.note || "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <p className="mt-4 border-t border-slate-300 pt-2 text-[8px] text-slate-500">
+          Masdora Team Dashboard · Data ditarik automatik dari sistem Recovery
+          CRM (masdora.zo.space).
+        </p>
+      </div>
     </div>
   );
 }
