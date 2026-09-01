@@ -149,3 +149,79 @@ export function shiftWeek(
   }
   return { year, month, week };
 }
+
+/** Jenis tempoh laporan. */
+export type JenisTempoh = "minggu" | "bulan" | "suku" | "tahun";
+
+export interface PilihanTempoh {
+  jenis: JenisTempoh;
+  year: number;
+  /** Untuk minggu & bulan. */
+  month: number;
+  /** Untuk minggu sahaja. */
+  week: number;
+  /** Untuk suku tahun (1-4). */
+  quarter: number;
+}
+
+export interface TempohRange extends WeekRange {
+  /** Contoh: "Minggu 1 · Ogos 2026" atau "Suku 3 2026" */
+  tajuk: string;
+  /** Bulan yang termasuk dalam tempoh ini (1-12). */
+  bulanTermasuk: number[];
+}
+
+/**
+ * Julat tarikh sebenar bagi mana-mana jenis tempoh.
+ *
+ * Semua seksyen laporan menapis mengikut julat tarikh, jadi menukar jenis
+ * tempoh hanya perlu menukar julat ini — bukan setiap seksyen.
+ */
+export function tempohRange(p: PilihanTempoh): TempohRange {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const akhirBulan = (y: number, m: number) => new Date(y, m, 0).getDate();
+
+  if (p.jenis === "minggu") {
+    const r = weekDateRange(p.year, p.month, p.week);
+    return {
+      ...r,
+      tajuk: `Minggu ${p.week} · ${monthName(p.month)} ${p.year}`,
+      bulanTermasuk: [p.month],
+    };
+  }
+
+  if (p.jenis === "bulan") {
+    return {
+      startIso: `${p.year}-${pad(p.month)}-01`,
+      endIso: `${p.year}-${pad(p.month)}-${pad(akhirBulan(p.year, p.month))}`,
+      label: `1 - ${akhirBulan(p.year, p.month)} ${monthName(p.month)} ${p.year}`,
+      tajuk: `${monthName(p.month)} ${p.year}`,
+      bulanTermasuk: [p.month],
+    };
+  }
+
+  if (p.jenis === "suku") {
+    const mula = (p.quarter - 1) * 3 + 1;
+    const tamat = mula + 2;
+    return {
+      startIso: `${p.year}-${pad(mula)}-01`,
+      endIso: `${p.year}-${pad(tamat)}-${pad(akhirBulan(p.year, tamat))}`,
+      label: `${monthName(mula)} - ${monthName(tamat)} ${p.year}`,
+      tajuk: `Suku ${p.quarter} · ${p.year}`,
+      bulanTermasuk: [mula, mula + 1, tamat],
+    };
+  }
+
+  return {
+    startIso: `${p.year}-01-01`,
+    endIso: `${p.year}-12-31`,
+    label: `Januari - Disember ${p.year}`,
+    tajuk: `Tahun ${p.year}`,
+    bulanTermasuk: Array.from({ length: 12 }, (_, i) => i + 1),
+  };
+}
+
+/** Suku tahun bagi satu bulan. */
+export function quarterOfMonth(month: number): number {
+  return Math.floor((month - 1) / 3) + 1;
+}

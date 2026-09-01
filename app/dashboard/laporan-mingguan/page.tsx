@@ -19,10 +19,12 @@ import {
   getCurrentMonth,
   getCurrentWeekOfMonth,
   monthName,
-  weekDateRange,
   isInWeek,
   shiftWeek,
-  type WeekRange,
+  tempohRange,
+  quarterOfMonth,
+  type PilihanTempoh,
+  type TempohRange,
 } from "@/lib/period";
 import MasdoraLogomark from "@/components/MasdoraLogomark";
 import {
@@ -91,6 +93,14 @@ interface CampaignItem {
 
 const MANAGEMENT_ROLES = ["manager", "ceo"];
 
+/** Nama tempoh dalam tajuk laporan. */
+const JENIS_LABEL: Record<string, string> = {
+  minggu: "Mingguan",
+  bulan: "Bulanan",
+  suku: "Suku Tahunan",
+  tahun: "Tahunan",
+};
+
 // ---------------------------------------------------------------- pembantu
 
 function rm(n: number): string {
@@ -142,10 +152,12 @@ function sortedEntries(m: Map<string, number>): [string, number][] {
 export default function LaporanMingguanPage() {
   const supabase = createClient();
 
-  const [period, setPeriod] = useState({
+  const [period, setPeriod] = useState<PilihanTempoh>({
+    jenis: "minggu",
     year: getCurrentYear(),
     month: getCurrentMonth(),
     week: getCurrentWeekOfMonth(),
+    quarter: quarterOfMonth(getCurrentMonth()),
   });
 
   const [me, setMe] = useState<Profile | null>(null);
@@ -166,10 +178,7 @@ export default function LaporanMingguanPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [generatedAt, setGeneratedAt] = useState<string>("");
 
-  const range: WeekRange = useMemo(
-    () => weekDateRange(period.year, period.month, period.week),
-    [period]
-  );
+  const range: TempohRange = useMemo(() => tempohRange(period), [period]);
 
   const todayIso = new Date().toISOString().slice(0, 10);
   const isFuture = range.startIso > todayIso;
@@ -210,18 +219,25 @@ export default function LaporanMingguanPage() {
       { data: planRows, error: planErr },
     ] = await Promise.all([
       supabase.from("profiles").select("*").eq("active", true).order("full_name"),
-      supabase
-        .from("todos")
-        .select("*")
-        .eq("year", period.year)
-        .eq("month", period.month)
-        .eq("week", period.week),
-      supabase
-        .from("weekly_submissions")
-        .select("*")
-        .eq("year", period.year)
-        .eq("month", period.month)
-        .eq("week", period.week),
+      // To-do disimpan mengikut tahun/bulan/minggu, bukan tarikh — jadi ia
+      // ditapis mengikut bulan yang termasuk dalam tempoh, dan minggu
+      // hanya bila laporan itu memang laporan mingguan.
+      (() => {
+        const q = supabase
+          .from("todos")
+          .select("*")
+          .eq("year", period.year)
+          .in("month", range.bulanTermasuk);
+        return period.jenis === "minggu" ? q.eq("week", period.week) : q;
+      })(),
+      (() => {
+        const q = supabase
+          .from("weekly_submissions")
+          .select("*")
+          .eq("year", period.year)
+          .in("month", range.bulanTermasuk);
+        return period.jenis === "minggu" ? q.eq("week", period.week) : q;
+      })(),
       supabase
         .from("sales")
         .select("*")
@@ -293,7 +309,7 @@ export default function LaporanMingguanPage() {
     setWarnings(warn);
     setGeneratedAt(new Date().toLocaleString("ms-MY"));
     setLoading(false);
-  }, [supabase, period, range.startIso, range.endIso]);
+  }, [supabase, period, range.startIso, range.endIso, range.bulanTermasuk]);
 
   useEffect(() => {
     if (allowed) load();
@@ -310,7 +326,8 @@ export default function LaporanMingguanPage() {
       team
         .map((p) => {
           const mine = todos.filter((t) => t.user_id === p.id);
-          const sub = subs.find((s) => s.user_id === p.id) ?? null;
+          const subSaya = subs.filter((s) => s.user_id === p.id);
+          const sub = subSaya[0] ?? null;
           const pct =
             mine.length > 0
               ? Math.round(
@@ -324,6 +341,10 @@ export default function LaporanMingguanPage() {
             tangguh: mine.filter((t) => t.status === "tangguh").length,
             pct,
             sub,
+            // Untuk tempoh lebih panjang daripada seminggu, bilangan
+            // penghantaran lebih bermakna daripada satu status tunggal.
+            bilHantar: subSaya.filter((s) => s.submitted_at).length,
+            bilTepat: subSaya.filter((s) => s.on_time).length,
           };
         })
         .sort((a, b) => {
@@ -334,9 +355,17 @@ export default function LaporanMingguanPage() {
         }),
     [team, todos, subs]
   );
+  // Untuk tempoh panjang, kira jumlah penghantaran merentas semua minggu.
+  const submittedCount =
+    period.jenis === "minggu"
+      ? todoRows.filter((r) => r.sub?.submitted_at).length
+      : todoRows.reduce((s, r) => s + r.bilHantar, 0);
+  const onTimeCount =
+    period.jenis === "minggu"
+      ? todoRows.filter((r) => r.sub?.on_time).length
+      : todoRows.reduce((s, r) => s + r.bilTepat, 0);
 
-  const submittedCount = todoRows.filter((r) => r.sub?.submitted_at).length;
-  const onTimeCount = todoRows.filter((r) => r.sub?.on_time).length;
+
   const avgPct =
     todoRows.length > 0
       ? Math.round(todoRows.reduce((s, r) => s + r.pct, 0) / todoRows.length)
@@ -503,71 +532,130 @@ export default function LaporanMingguanPage() {
       {/* ---------------- Kawalan (tidak dicetak) ---------------- */}
       <div className="tiada-cetak space-y-4">
         <div>
-          <h2 className="text-xl font-bold text-white">Laporan Mingguan</h2>
+          <h2 className="text-xl font-bold text-white">Laporan Pasukan</h2>
           <p className="text-sm text-muted">
             Satu laporan lengkap semua bahagian — sedia untuk dihantar kepada
             CEO dalam bentuk PDF.
           </p>
         </div>
 
-        <div className="card flex flex-wrap items-end gap-3">
-          <button
-            className="btn-secondary"
-            onClick={() => setPeriod((p) => shiftWeek(p, -1))}
-          >
-            ‹ Minggu Sebelum
-          </button>
-          <button
-            className="btn-secondary"
-            onClick={() =>
-              setPeriod({
-                year: getCurrentYear(),
-                month: getCurrentMonth(),
-                week: getCurrentWeekOfMonth(),
-              })
-            }
-          >
-            Minggu Ini
-          </button>
-          <button
-            className="btn-secondary"
-            onClick={() => setPeriod((p) => shiftWeek(p, 1))}
-          >
-            Minggu Depan ›
-          </button>
+        {/* Jenis tempoh */}
+        <div className="card flex flex-wrap items-center gap-2">
+          {(
+            [
+              { j: "minggu", label: "Mingguan" },
+              { j: "bulan", label: "Bulanan" },
+              { j: "suku", label: "Suku Tahun" },
+              { j: "tahun", label: "Tahunan" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.j}
+              onClick={() => setPeriod({ ...period, jenis: t.j })}
+              className={`pill ${
+                period.jenis === t.j ? "pill-oren" : "pill-kosong"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+          <span className="ml-auto text-xs text-muted">
+            {range.tajuk} · {range.label}
+          </span>
+        </div>
 
-          <div>
-            <label className="label">Bulan</label>
-            <select
-              className="input"
-              value={period.month}
-              onChange={(e) =>
-                setPeriod({ ...period, month: Number(e.target.value) })
-              }
-            >
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>
-                  {monthName(m)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Minggu</label>
-            <select
-              className="input"
-              value={period.week}
-              onChange={(e) =>
-                setPeriod({ ...period, week: Number(e.target.value) })
-              }
-            >
-              {[1, 2, 3, 4].map((w) => (
-                <option key={w} value={w}>
-                  Minggu {w}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="card flex flex-wrap items-end gap-3">
+          {period.jenis === "minggu" && (
+            <>
+              <button
+                className="btn-secondary"
+                onClick={() =>
+                  setPeriod((p) => ({ ...p, ...shiftWeek(p, -1) }))
+                }
+              >
+                ‹ Minggu Sebelum
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() =>
+                  setPeriod((p) => ({
+                    ...p,
+                    year: getCurrentYear(),
+                    month: getCurrentMonth(),
+                    week: getCurrentWeekOfMonth(),
+                  }))
+                }
+              >
+                Minggu Ini
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => setPeriod((p) => ({ ...p, ...shiftWeek(p, 1) }))}
+              >
+                Minggu Depan ›
+              </button>
+            </>
+          )}
+
+          {/* Bulan hanya berkaitan untuk laporan mingguan & bulanan */}
+          {(period.jenis === "minggu" || period.jenis === "bulan") && (
+            <div>
+              <label className="label">Bulan</label>
+              <select
+                className="input"
+                value={period.month}
+                onChange={(e) =>
+                  setPeriod({ ...period, month: Number(e.target.value) })
+                }
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={m}>
+                    {monthName(m)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {period.jenis === "minggu" && (
+            <div>
+              <label className="label">Minggu</label>
+              <select
+                className="input"
+                value={period.week}
+                onChange={(e) =>
+                  setPeriod({ ...period, week: Number(e.target.value) })
+                }
+              >
+                {[1, 2, 3, 4].map((w) => (
+                  <option key={w} value={w}>
+                    Minggu {w}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {period.jenis === "suku" && (
+            <div>
+              <label className="label">Suku Tahun</label>
+              <select
+                className="input"
+                value={period.quarter}
+                onChange={(e) =>
+                  setPeriod({ ...period, quarter: Number(e.target.value) })
+                }
+              >
+                {[1, 2, 3, 4].map((q) => (
+                  <option key={q} value={q}>
+                    Suku {q} ({monthName((q - 1) * 3 + 1)}–
+                    {monthName((q - 1) * 3 + 3)})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="label">Tahun</label>
             <select
@@ -639,13 +727,13 @@ export default function LaporanMingguanPage() {
                 MASDORA
               </p>
               <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
-                Laporan Mingguan Pasukan
+                Laporan {JENIS_LABEL[period.jenis]} Pasukan
               </p>
             </div>
           </div>
           <div className="text-right">
             <p className="text-base font-black text-slate-900">
-              Minggu {period.week} · {monthName(period.month)} {period.year}
+              {range.tajuk}
             </p>
             <p className="text-xs text-slate-600">{range.label}</p>
             <p className="mt-1 text-[10px] text-slate-500">
@@ -662,8 +750,8 @@ export default function LaporanMingguanPage() {
         {(isFuture || isPartial) && (
           <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-[11px] text-amber-900">
             {isFuture
-              ? "Minggu ini BELUM bermula. Laporan menunjukkan rancangan yang sudah dimasukkan (to-do, deadline tugasan, pelancaran kempen) — bukan keputusan sebenar."
-              : "Minggu ini MASIH BERJALAN. Angka di bawah adalah setakat hari ini dan masih boleh berubah sebelum Jumaat 5:00 petang."}
+              ? `Tempoh ini BELUM bermula. Laporan menunjukkan rancangan yang sudah dimasukkan (to-do, deadline tugasan, pelancaran kempen) — bukan keputusan sebenar.`
+              : `Tempoh ini MASIH BERJALAN. Angka di bawah adalah setakat hari ini dan masih boleh berubah sebelum ${range.label.split(" - ")[1] ?? "tempoh tamat"}.`}
           </p>
         )}
 
@@ -675,13 +763,13 @@ export default function LaporanMingguanPage() {
             <Seksyen no="1" tajuk="Ringkasan Eksekutif">
               <div className="grid grid-cols-3 gap-3">
                 <Kotak
-                  label="Jualan Minggu Ini"
+                  label="Jualan Tempoh Ini"
                   nilai={rm(salesTotal)}
                   kecil={`${sales.length} rekod`}
                 />
                 <Kotak
                   label="Penghantaran To-Do"
-                  nilai={`${submittedCount}/${todoRows.length}`}
+                  nilai={period.jenis === "minggu" ? `${submittedCount}/${todoRows.length}` : num(submittedCount)}
                   kecil={`${onTimeCount} tepat masa`}
                 />
                 <Kotak
@@ -737,7 +825,9 @@ export default function LaporanMingguanPage() {
                     num(r.siap),
                     r.tangguh > 0 ? num(r.tangguh) : "-",
                     `${r.pct}%`,
-                    r.sub?.submitted_at
+                    period.jenis !== "minggu"
+                      ? `${r.bilHantar} hantar · ${r.bilTepat} tepat masa`
+                      : r.sub?.submitted_at
                       ? r.sub.on_time
                         ? "Tepat masa"
                         : "Lewat"

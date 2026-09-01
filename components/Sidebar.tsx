@@ -162,7 +162,7 @@ export default function Sidebar({
       items: [
         {
           href: "/dashboard/laporan-mingguan",
-          label: "Laporan Mingguan (PDF)",
+          label: "Laporan & PDF",
           icon: "📄",
           show: manager || role === "ceo",
         },
