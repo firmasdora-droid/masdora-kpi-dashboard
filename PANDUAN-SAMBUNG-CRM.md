@@ -13,33 +13,32 @@ berjaya / jumlah RM.
 ## Langkah dari kamu (sekali sahaja)
 
 CRM ini menggunakan **akaun individu** (emel + kata laluan), bukan satu kata
-laluan kongsi seperti CRM lama. Jadi dashboard perlu akaunnya sendiri.
+laluan kongsi seperti CRM lama. Dashboard log masuk menggunakan **akaun
+Maisarah**, kerana CRM itu bukan di bawah kawalan Masdora dan akaun baharu
+tidak boleh dicipta.
 
-### 1. Buat akaun CRM untuk dashboard
+Dashboard hanya **membaca** — ia tidak pernah menulis ke CRM.
 
-Dalam CRM, cipta satu akaun khas — contohnya:
+### Kesan yang perlu diketahui
 
-```
-dashboard@masdora.com
-```
+Kerana akaun Maisarah yang digunakan:
 
-Gunakan akaun berasingan, **bukan akaun Maisarah**. Sebabnya:
-- Kalau Maisarah tukar kata laluan, penyegerakan tidak terhenti
-- Log CRM menunjukkan dengan jelas mana capaian dashboard dan mana capaian manusia
-- Akaun itu boleh dimatikan tanpa menjejaskan sesiapa
+- **Kalau Maisarah tukar kata laluan CRM, penyegerakan akan berhenti.**
+  Gejalanya: halaman Recovery berkata "Log masuk CRM gagal". Pembetulannya:
+  kemas kini `CRM_PASSWORD` di Vercel kepada kata laluan baharu, kemudian
+  Redeploy.
+- Log CRM akan menunjukkan capaian dashboard sebagai capaian Maisarah.
+  Ini tidak menjejaskan apa-apa, cuma perlu diingat kalau ada audit.
 
-Akaun itu perlu keizinan **membaca** sahaja — dashboard tidak pernah menulis
-ke CRM.
-
-### 2. Masukkan akaun itu di Vercel
+### Masukkan akaun itu di Vercel
 
 1. https://vercel.com/dashboard → projek **masdora-kpi-dashboard**
 2. **Settings** → **Environment Variables** → **Add New**
 
    | Key | Value |
    |---|---|
-   | `CRM_EMAIL` | emel akaun dashboard |
-   | `CRM_PASSWORD` | kata laluan akaun itu |
+   | `CRM_EMAIL` | emel Maisarah di CRM |
+   | `CRM_PASSWORD` | kata laluan CRM Maisarah |
 
    Environments: tandakan **Production** dan **Preview**.
 
@@ -101,7 +100,7 @@ yang CRM sebenarnya balas.
 | Mesej | Maksud | Tindakan |
 |---|---|---|
 | `CRM_EMAIL dan CRM_PASSWORD belum ditetapkan` | Langkah 2 belum dibuat | Tetapkan env var, kemudian Redeploy |
-| Log masuk gagal | Emel/kata laluan salah, atau akaun dinyahaktifkan | Semak akaun itu boleh log masuk sendiri di CRM |
+| Log masuk gagal | Kata laluan Maisarah sudah ditukar, atau akaun dinyahaktifkan | Kemas kini `CRM_PASSWORD` di Vercel, kemudian Redeploy |
 | `Tiada baris data dikenali` | Log masuk berjaya, tetapi bentuk data berbeza | Hantar tangkapan skrin panel Periksa |
 
 Panel Periksa terhad kepada Marketing Manager & CEO kerana ia memaparkan
@@ -111,7 +110,7 @@ data customer.
 
 ## Nota keselamatan
 
-- Akaun CRM disimpan sebagai env var Vercel, dibaca di sebelah pelayan
+- Akaun CRM (Maisarah) disimpan sebagai env var Vercel, dibaca di sebelah pelayan
   sahaja. Ia tidak pernah dihantar ke pelayar dan tidak kelihatan dalam
   mana-mana halaman dashboard.
 - Aliran data **satu hala**: CRM → dashboard. Dashboard tidak boleh
