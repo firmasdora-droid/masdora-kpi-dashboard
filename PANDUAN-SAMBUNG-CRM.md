@@ -1,31 +1,50 @@
-# Panduan: Dashboard Tarik Data Recovery CRM Secara Automatik
+# Panduan: Dashboard Tarik Data CRM Secara Automatik
+
+CRM: **https://masdora-crm-masdora.zocomputer.io**
 
 Maisarah kemas kini rekod dalam CRM seperti biasa → dashboard log masuk
-sendiri ke CRM, tarik data, dan papar bilangan dihubungi / berjaya pulih /
-tidak berjaya / jumlah RM.
+sendiri, tarik data, dan papar bilangan dihubungi / berjaya pulih / tidak
+berjaya / jumlah RM.
 
 **Tiada apa yang perlu diubah pada sistem CRM.**
 
 ---
 
-## Satu langkah sahaja dari kamu
+## Langkah dari kamu (sekali sahaja)
 
-Dashboard perlu tahu kata laluan team CRM supaya ia boleh log masuk sendiri.
-Kata laluan itu disimpan di Vercel — ia tidak pernah dihantar ke pelayar
-sesiapa, dan tidak kelihatan dalam dashboard.
+CRM ini menggunakan **akaun individu** (emel + kata laluan), bukan satu kata
+laluan kongsi seperti CRM lama. Jadi dashboard perlu akaunnya sendiri.
 
-1. Buka https://vercel.com/dashboard → projek **masdora-kpi-dashboard**
+### 1. Buat akaun CRM untuk dashboard
+
+Dalam CRM, cipta satu akaun khas — contohnya:
+
+```
+dashboard@masdora.com
+```
+
+Gunakan akaun berasingan, **bukan akaun Maisarah**. Sebabnya:
+- Kalau Maisarah tukar kata laluan, penyegerakan tidak terhenti
+- Log CRM menunjukkan dengan jelas mana capaian dashboard dan mana capaian manusia
+- Akaun itu boleh dimatikan tanpa menjejaskan sesiapa
+
+Akaun itu perlu keizinan **membaca** sahaja — dashboard tidak pernah menulis
+ke CRM.
+
+### 2. Masukkan akaun itu di Vercel
+
+1. https://vercel.com/dashboard → projek **masdora-kpi-dashboard**
 2. **Settings** → **Environment Variables** → **Add New**
 
-   | Ruangan | Isi |
+   | Key | Value |
    |---|---|
-   | Key | `CRM_TEAM_PASSWORD` |
-   | Value | kata laluan team CRM |
-   | Environments | tanda **Production**, **Preview**, **Development** |
-   | Sensitive | hidupkan |
+   | `CRM_EMAIL` | emel akaun dashboard |
+   | `CRM_PASSWORD` | kata laluan akaun itu |
+
+   Environments: tandakan **Production** dan **Preview**.
 
 3. **Save**
-4. Tab **Deployments** → deployment paling atas → **⋯** → **Redeploy**
+4. **Deployments** → deployment paling atas → **⋯** → **Redeploy**
 
 Selesai. Buka halaman **Recovery CRM** — data akan masuk sendiri.
 
@@ -37,108 +56,63 @@ Selesai. Buka halaman **Recovery CRM** — data akan masuk sendiri.
 Maisarah kemas kini CRM
         │
         ▼
-masdora.zo.space/team/recovery-crm
+masdora-crm-masdora.zocomputer.io
         │
-        │  dashboard log masuk (POST pw=...) dan baca jadual
+        │  dashboard POST /api/auth/login, simpan cookie sesi, baca data
         ▼
 /api/crm-sync  ──►  jadual recovery_records  ──►  halaman Recovery CRM
-                                              └►  Laporan Mingguan PDF
+                                              ├►  Laporan PDF
+                                              └►  Jualan pulih -> jualan Maisarah
 ```
 
 Penyegerakan berlaku:
 
 - **Setiap kali sesiapa membuka halaman Recovery CRM** (paling kerap sekali
   setiap 5 minit, supaya CRM tidak dibebani)
-- **Bila butang "Tarik Data CRM" ditekan** — segera, tanpa menunggu
+- **Bila butang "Tarik Data CRM" ditekan** — segera
 - Boleh juga dipanggil oleh automasi luar:
   `GET /api/crm-sync?secret=<INGEST_SECRET>`
-
-### Kenapa ada had 5 minit
-
-Kalau tiga orang membuka halaman itu serentak, tanpa had ini CRM akan
-menerima tiga permintaan log masuk sekali gus. Tekan **Tarik Data CRM**
-untuk memintas had itu bila kamu perlukan data terkini serta-merta.
 
 ---
 
 ## Rekod tidak akan jadi dua
 
-Setiap rekod dipadankan melalui `source_id`:
-
-- Kalau jadual CRM ada lajur ID → `crm-<id>`
-- Kalau tiada → `crm-<nama><telefon>`
-
-Jadi menarik data 100 kali tetap menghasilkan satu baris bagi setiap
-customer — cuma dikemas kini.
+Setiap rekod dipadankan melalui `source_id` yang stabil (nombor pesanan).
+Menarik data 100 kali tetap menghasilkan satu baris bagi setiap customer.
 
 ---
 
 ## Status — tidak perlu ejaan tepat
 
-Dashboard padankan sendiri apa sahaja istilah yang CRM guna:
-
 | Kategori dashboard | Perkataan yang dikenali |
 |---|---|
-| **Berjaya Pulih** | pulih, recover, berjaya, success, closed won, won, bayar, paid |
-| **Tidak Berjaya** | gagal, fail, lost, tolak, reject, tak jadi, batal |
-| **Sedang Dihubungi** | proses, hubung, contact, follow, pending, ongoing, progress |
-| **Baru** | baru, new, open |
-
-Maisarah tidak perlu mengubah cara dia bekerja.
-
----
-
-## Lajur dikesan melalui tajuk, bukan kedudukan
-
-| Data | Tajuk lajur yang dikenali |
-|---|---|
-| ID | ID, NO, BIL, REF |
-| Nama | NAMA, NAME, CUSTOMER, PELANGGAN |
-| Telefon | PHONE, TELEFON, CONTACT, NOMBOR, WHATSAPP |
-| Status | STATUS, KEADAAN |
-| Jumlah | AMOUNT, JUMLAH, RM, NILAI, HARGA, VALUE |
-| Tarikh | TARIKH, DATE, CONTACTED, DIHUBUNGI, FOLLOW |
-| Handler | HANDLER, AGENT, PIC, OLEH, CS |
-| Catatan | NOTE, NOTA, CATATAN, REMARK |
-
-Menambah lajur baru atau menyusun semula lajur dalam CRM **tidak akan**
-merosakkan penyegerakan.
+| **Berjaya Pulih** | paid, recover, won, pulih, berjaya, bayar, success |
+| **Tidak Berjaya** | void, refund, cancel, lost, gagal, tolak, batal |
+| **Sedang Dihubungi** | contact, hubung, follow, progress, ongoing, proses |
+| **Baru** | abandon, expire, unpaid, pending, open, new, baru |
 
 ---
 
 ## Kalau data tidak masuk
 
-Buka halaman Recovery CRM — mesejnya akan menyatakan puncanya.
+Buka halaman Recovery CRM dan tekan **Periksa**. Panel itu memaparkan apa
+yang CRM sebenarnya balas.
 
 | Mesej | Maksud | Tindakan |
 |---|---|---|
-| `CRM_TEAM_PASSWORD belum ditetapkan` | Langkah di atas belum dibuat | Tetapkan env var, kemudian Redeploy |
-| `Kata laluan CRM ditolak` | Kata laluan salah atau sudah ditukar | Kemas kini nilai di Vercel |
-| `Tiada baris data dikenali` | Log masuk berjaya, tetapi jadual berbeza daripada jangkaan | Lihat bawah |
-| `CRM membalas HTTP 5xx` | CRM sedang tidak berfungsi | Cuba semula kemudian |
+| `CRM_EMAIL dan CRM_PASSWORD belum ditetapkan` | Langkah 2 belum dibuat | Tetapkan env var, kemudian Redeploy |
+| Log masuk gagal | Emel/kata laluan salah, atau akaun dinyahaktifkan | Semak akaun itu boleh log masuk sendiri di CRM |
+| `Tiada baris data dikenali` | Log masuk berjaya, tetapi bentuk data berbeza | Hantar tangkapan skrin panel Periksa |
 
-### Kalau "tiada baris data dikenali"
-
-Ini bermakna dashboard berjaya masuk tetapi tidak mengenali bentuk
-jadualnya. Sebagai manager, buka pautan ini dalam pelayar (kamu perlu sudah
-log masuk ke dashboard):
-
-```
-https://masdora-kpi-dashboard.vercel.app/api/crm-sync?debug=1
-```
-
-Ia akan memaparkan tajuk lajur sebenar CRM dan 3 baris pertama, **tanpa
-menyimpan apa-apa**. Hantar hasil itu kepada saya dan saya laraskan pembaca
-supaya padan. Halaman ini terhad kepada Marketing Manager & CEO sahaja.
+Panel Periksa terhad kepada Marketing Manager & CEO kerana ia memaparkan
+data customer.
 
 ---
 
 ## Nota keselamatan
 
-- Kata laluan CRM disimpan sebagai secret Vercel, dibaca di sebelah pelayan
+- Akaun CRM disimpan sebagai env var Vercel, dibaca di sebelah pelayan
   sahaja. Ia tidak pernah dihantar ke pelayar dan tidak kelihatan dalam
   mana-mana halaman dashboard.
 - Aliran data **satu hala**: CRM → dashboard. Dashboard tidak boleh
   mengubah apa-apa dalam CRM.
-- Mod `?debug=1` memaparkan data customer, jadi ia dihadkan kepada
-  Marketing Manager & CEO.

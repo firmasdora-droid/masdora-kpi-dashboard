@@ -1,21 +1,26 @@
 /**
- * Menarik data terus dari Masdora Recovery CRM (masdora.zo.space).
+ * Menarik data terus dari Masdora CRM
+ * (masdora-crm-masdora.zocomputer.io).
  *
- * CRM itu dilindungi oleh SATU kata laluan team yang dikongsi. Kata laluan
- * itu disimpan sebagai env var di Vercel (CRM_TEAM_PASSWORD) dan hanya
- * digunakan di sebelah pelayan — ia tidak pernah dihantar ke pelayar.
+ * CRM ini menggunakan akaun individu. Dashboard log masuk dengan akaunnya
+ * sendiri — CRM_EMAIL & CRM_PASSWORD, disimpan sebagai env var di Vercel
+ * dan dibaca di sebelah pelayan sahaja. Ia tidak pernah dihantar ke pelayar.
  *
  * Aliran:
- *   1. POST pw=<kata laluan> ke halaman CRM
- *   2. Simpan cookie sesi, ambil halaman dashboard
- *   3. Baca jadual HTML (atau JSON terbenam) menjadi rekod
+ *   1. POST JSON {email, password} ke /api/auth/login
+ *   2. Simpan cookie sesi, ambil halaman utama
+ *   3. Baca JSON terbenam (atau jadual HTML) menjadi rekod
  *
- * Kenapa membaca HTML dan bukan API: CRM itu tiada API. Borangnya
- * menghantar `pw` terus ke URL yang sama. Jadi kita meniru apa yang
- * pelayar buat.
+ * Kenapa membaca halaman dan bukan API khusus: CRM tidak mendedahkan API
+ * data awam. Jadi kita meniru apa yang pelayar buat.
  */
 
-export const CRM_URL = "https://masdora.zo.space/team/recovery-crm";
+/** Halaman utama CRM selepas log masuk. */
+export const CRM_URL = "https://masdora-crm-masdora.zocomputer.io/";
+
+/** Log masuk: POST JSON {email, password}. */
+export const LOGIN_URL =
+  "https://masdora-crm-masdora.zocomputer.io/api/auth/login";
 
 /**
  * Status & catatan yang ditetapkan oleh pasukan (Open / Contacted /
@@ -25,7 +30,7 @@ export const CRM_URL = "https://masdora.zo.space/team/recovery-crm";
  * exposing /api/masdora-status), statuses & notes are shared across the
  * whole team."
  */
-export const CRM_STATUS_URL = "https://masdora.zo.space/api/masdora-status";
+export const CRM_STATUS_URL = "https://masdora-crm-masdora.zocomputer.io/api/masdora-status";
 
 export interface CrmRow {
   source_id: string;
@@ -151,6 +156,8 @@ export interface JejakLogMasuk {
   statusAkhir: number;
   panjangHtml: number;
   masihBorangLogMasuk: boolean;
+  /** Mesej ralat dari CRM kalau log masuk ditolak. */
+  mesejLogin?: string;
   /** Cebisan teks halaman, untuk melihat apa yang sebenarnya dibalas. */
   cebisan: string;
 }
@@ -197,63 +204,55 @@ function borangLogMasuk(html: string): boolean {
  * sedangkan ia betul. Sebab itu pengalihan dikendalikan secara manual di
  * sini, dengan cookie dibawa bersama.
  */
-export async function ambilHalamanCrm(kataLaluan: string): Promise<HasilCrm> {
+export async function ambilHalamanCrm(
+  emel: string,
+  kataLaluan: string
+): Promise<HasilCrm> {
   const kepala = {
-    "Content-Type": "application/x-www-form-urlencoded",
     "User-Agent":
       "Mozilla/5.0 (compatible; MasdoraDashboard/1.0; +https://masdora-kpi-dashboard.vercel.app)",
-    Accept: "text/html,application/xhtml+xml",
+    Accept: "text/html,application/xhtml+xml,application/json",
   };
 
-  const post = await fetch(CRM_URL, {
+  // CRM baharu menggunakan akaun individu: POST JSON {email, password}
+  // ke /api/auth/login, kemudian sesi dibawa melalui cookie.
+  const post = await fetch(LOGIN_URL, {
     method: "POST",
-    headers: kepala,
-    body: new URLSearchParams({ pw: kataLaluan }).toString(),
-    redirect: "manual", // jangan ikut sendiri — cookie perlu dibawa
+    headers: { ...kepala, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: emel, password: kataLaluan }),
+    redirect: "manual",
     cache: "no-store",
   });
 
   const cookie = kutipCookie(post);
   const lokasi = post.headers.get("location");
 
+  // Balasan login ialah JSON {ok:true} — bukan halaman. Halaman data
+  // diambil selepas itu menggunakan cookie sesi.
+  let mesejLogin = "";
+  try {
+    const j = (await post.clone().json()) as { ok?: boolean; error?: unknown };
+    if (j?.error) mesejLogin = String(j.error);
+  } catch {
+    // balasan bukan JSON — diabaikan, status HTTP sudah cukup
+  }
+
+  const ditolak = post.status === 401 || post.status === 403 || !cookie;
+
   let html = "";
   let statusAkhir = post.status;
 
-  // 3xx: ikut pengalihan sambil membawa cookie sesi.
-  if (post.status >= 300 && post.status < 400) {
-    const url = lokasi
-      ? new URL(lokasi, CRM_URL).toString()
-      : CRM_URL;
-    const ikut = await fetch(url, {
+  if (!ditolak) {
+    const utama = await fetch(CRM_URL, {
       headers: { ...kepala, Cookie: cookie },
+      redirect: "follow",
       cache: "no-store",
     });
-    statusAkhir = ikut.status;
-    html = await ikut.text();
-  } else {
-    html = await post.text();
-
-    // Ada laman membalas 200 dengan borang log masuk semula walaupun
-    // kata laluan betul, dan hanya memberi data pada permintaan GET
-    // berikutnya. Kalau ada cookie, cuba sekali lagi dengannya.
-    if (cookie && borangLogMasuk(html)) {
-      const semula = await fetch(CRM_URL, {
-        headers: { ...kepala, Cookie: cookie },
-        cache: "no-store",
-      });
-      statusAkhir = semula.status;
-      html = await semula.text();
-    }
+    statusAkhir = utama.status;
+    html = await utama.text();
   }
 
   const masihBorang = borangLogMasuk(html);
-
-  // CRM membalas 401 khusus untuk kata laluan salah (disahkan dengan
-  // menghantar kata laluan palsu). Jadi status itu — bukan kehadiran borang
-  // — yang menentukan sama ada log masuk ditolak. Halaman yang sudah log
-  // masuk mungkin masih mengandungi medan `pw` (contohnya borang tukar kata
-  // laluan), dan menganggapnya sebagai penolakan adalah silap.
-  const ditolak = post.status === 401 || post.status === 403;
 
   return {
     html,
@@ -266,6 +265,7 @@ export async function ambilHalamanCrm(kataLaluan: string): Promise<HasilCrm> {
       statusAkhir,
       panjangHtml: html.length,
       masihBorangLogMasuk: masihBorang,
+      mesejLogin,
       cebisan: html
         .replace(/<script[\s\S]*?<\/script>/gi, " ")
         .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -299,7 +299,7 @@ function kunciId(v: unknown): string {
  * Ambil alamat & token penyegerakan yang tertanam dalam halaman CRM.
  *
  * CRM menyimpannya sebagai pemboleh ubah JavaScript:
- *   var SYNC_URL   = "https://masdora.zo.space/api/masdora-status";
+ *   var SYNC_URL   = "https://masdora-crm-masdora.zocomputer.io/api/masdora-status";
  *   var SYNC_TOKEN = "masdora-...";
  *
  * Membacanya dari halaman lebih baik daripada menyimpan salinan sendiri:
@@ -462,17 +462,18 @@ export async function cubaDenganCookie(
 }
 
 export async function cubaAlamat(
+  emel: string,
   kataLaluan: string,
   laluan: string
 ): Promise<HasilCubaan> {
   // Log masuk untuk mendapatkan cookie sesi.
-  const post = await fetch(CRM_URL, {
+  const post = await fetch(LOGIN_URL, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
       "User-Agent": "Mozilla/5.0 (compatible; MasdoraDashboard/1.0)",
     },
-    body: new URLSearchParams({ pw: kataLaluan }).toString(),
+    body: JSON.stringify({ email: emel, password: kataLaluan }),
     redirect: "manual",
     cache: "no-store",
   });

@@ -18,7 +18,7 @@ interface RecoveryRecord {
   updated_at: string;
 }
 
-const CRM_URL = "https://masdora.zo.space/team/recovery-crm";
+const CRM_URL = "https://masdora-crm-masdora.zocomputer.io/";
 
 /** Bentuk balasan /api/crm-sync?debug=1 */
 interface DiagnosisCrm {
@@ -337,7 +337,7 @@ export default function RecoveryPage() {
               </p>
               <p className="mt-1 text-xs text-slate-300">
                 {syncMsg ??
-                  "Dashboard akan log masuk ke CRM dan menarik data secara automatik sebaik CRM_TEAM_PASSWORD ditetapkan di Vercel."}
+                  "Dashboard akan log masuk ke CRM dan menarik data secara automatik sebaik CRM_EMAIL & CRM_PASSWORD ditetapkan di Vercel."}
               </p>
               <button
                 onClick={periksa}
@@ -448,7 +448,7 @@ export default function RecoveryPage() {
                       >
                         <p className="font-mono text-[10px] text-slate-400">
                           HTTP {b.status} · {b.jenis || "tiada jenis"} ·{" "}
-                          {b.url.replace("https://masdora.zo.space", "")}
+                          {b.url.replace("https://masdora-crm-masdora.zocomputer.io", "")}
                         </p>
                         <p className="mt-1 max-h-28 overflow-auto font-mono text-[11px] leading-relaxed text-amber-100">
                           {b.cebisan || "(kosong)"}
@@ -743,7 +743,7 @@ export default function RecoveryPage() {
 
         <p className="mt-4 border-t border-slate-300 pt-2 text-[8px] text-slate-500">
           Masdora Team Dashboard · Data ditarik automatik dari sistem Recovery
-          CRM (masdora.zo.space).
+          CRM (masdora-crm-masdora.zocomputer.io).
         </p>
       </div>
     </div>

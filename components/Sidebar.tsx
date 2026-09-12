@@ -146,7 +146,7 @@ export default function Sidebar({
           show: isMaisarah || manager || role === "ceo",
         },
         {
-          href: "https://masdora.zo.space/team/recovery-crm",
+          href: "https://masdora-crm-masdora.zocomputer.io/",
           label: "Buka Sistem CRM",
           icon: "🔗",
           // Maisarah yang menguruskan recovery, tetapi Marketing Manager & CEO

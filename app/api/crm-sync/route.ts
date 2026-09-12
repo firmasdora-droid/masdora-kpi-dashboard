@@ -1,12 +1,12 @@
 /**
  * Tarik data Recovery CRM dan simpan ke dashboard.
  *
- * Dashboard log masuk sendiri ke masdora.zo.space, baca jadual, dan
+ * Dashboard log masuk sendiri ke masdora-crm-masdora.zocomputer.io, baca jadual, dan
  * kemas kini jadual `recovery_records`. Tiada apa yang perlu diubah pada
  * CRM — Maisarah cuma kemas kini seperti biasa.
  *
  * Env yang diperlukan di Vercel:
- *   CRM_TEAM_PASSWORD          — kata laluan team CRM (server sahaja)
+ *   CRM_EMAIL + CRM_PASSWORD   — akaun CRM untuk dashboard (server sahaja)
  *   SUPABASE_SERVICE_ROLE_KEY  — untuk menulis ke database
  *   INGEST_SECRET              — untuk membenarkan panggilan cron
  *
@@ -77,12 +77,12 @@ export async function GET(request: Request) {
     return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   }
 
-  if (!process.env.CRM_TEAM_PASSWORD) {
+  if (!process.env.CRM_EMAIL || !process.env.CRM_PASSWORD) {
     return Response.json(
       {
         ok: false,
         error:
-          "CRM_TEAM_PASSWORD belum ditetapkan di Vercel. Rujuk PANDUAN-SAMBUNG-CRM.md.",
+          "CRM_EMAIL dan CRM_PASSWORD belum ditetapkan di Vercel. Rujuk PANDUAN-SAMBUNG-CRM.md.",
         perluSetup: true,
       },
       { status: 503 }
@@ -138,7 +138,7 @@ export async function GET(request: Request) {
     try {
       return Response.json({
         ok: true,
-        cubaan: await cubaAlamat(process.env.CRM_TEAM_PASSWORD, cuba),
+        cubaan: await cubaAlamat(process.env.CRM_EMAIL, process.env.CRM_PASSWORD, cuba),
       });
     } catch (e) {
       return Response.json(
@@ -150,7 +150,7 @@ export async function GET(request: Request) {
 
   let hasil;
   try {
-    hasil = await ambilHalamanCrm(process.env.CRM_TEAM_PASSWORD);
+    hasil = await ambilHalamanCrm(process.env.CRM_EMAIL, process.env.CRM_PASSWORD);
   } catch (e) {
     return Response.json(
       {
@@ -238,7 +238,7 @@ export async function GET(request: Request) {
       {
         ok: false,
         error:
-          "Kata laluan CRM ditolak, atau CRM tidak memberikan sesi. Buka /api/crm-sync?debug=1 untuk melihat puncanya.",
+          "Log masuk CRM gagal. Semak CRM_EMAIL & CRM_PASSWORD di Vercel, dan pastikan akaun itu masih aktif. Tekan Periksa untuk butiran.",
         jejak: hasil.jejak,
       },
       { status: 401 }
