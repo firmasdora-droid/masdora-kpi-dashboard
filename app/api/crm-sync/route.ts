@@ -26,6 +26,7 @@ import {
   cubaAlamat,
   cubaDenganCookie,
   cariTetapanSync,
+  cariDataApi,
   gabungStatus,
   periksaStruktur,
 } from "@/lib/crm";
@@ -221,11 +222,37 @@ export async function GET(request: Request) {
         : "Token TIDAK dijumpai dalam halaman — corak SYNC_TOKEN tidak padan.",
     });
 
+    // Cari endpoint data supaya panel menunjukkan alamat mana yang menjadi.
+    let cariApi: Awaited<ReturnType<typeof cariDataApi>> | null = null;
+    try {
+      cariApi = await cariDataApi(hasil.html, hasil.cookie);
+    } catch {
+      // diabaikan
+    }
+
+    if (cariApi) {
+      cariApi.cubaan
+        .filter((c) => c.bil > 0 || c.status === 200)
+        .slice(0, 6)
+        .forEach((c) =>
+          balasanStatus.push({
+            url: c.url,
+            status: c.status,
+            jenis: "carian endpoint data",
+            cebisan: `${c.bil} rekod dikenali`,
+          })
+        );
+    }
+
     return Response.json({
       ok: true,
       logMasukBerjaya: hasil.berjaya,
       // Berapa rekod yang BOLEH dibaca — angka yang paling penting.
-      rekodDikenali: bacaRekod(hasil.html).length,
+      rekodDikenali: Math.max(
+        bacaRekod(hasil.html).length,
+        cariApi?.rekod.length ?? 0
+      ),
+      endpointData: cariApi?.url ?? null,
       statusPasukan: bilStatus,
       balasanStatus,
       jejak: hasil.jejak,
@@ -257,7 +284,22 @@ export async function GET(request: Request) {
     // diabaikan dengan sengaja
   }
 
-  const rekod = gabungStatus(bacaRekod(html), petaStatus);
+  // CRM baharu menyajikan datanya melalui API, bukan terbenam dalam HTML.
+  // Endpoint dicari sendiri; kalau tiada yang menjadi, pembaca halaman lama
+  // digunakan sebagai sandaran.
+  let sumber = "halaman";
+  let mentah = bacaRekod(html);
+  try {
+    const api = await cariDataApi(html, hasil.cookie);
+    if (api.rekod.length > mentah.length) {
+      mentah = api.rekod;
+      sumber = api.url ?? "api";
+    }
+  } catch {
+    // diabaikan — sandaran halaman masih ada
+  }
+
+  const rekod = gabungStatus(mentah, petaStatus);
 
   if (rekod.length === 0) {
     return Response.json(
@@ -306,6 +348,7 @@ export async function GET(request: Request) {
   return Response.json({
     ok: true,
     disegerakkan: rekod.length,
+    sumber,
     statusPasukan: petaStatus.size,
     jualanPulih: jualan,
     masa: now,

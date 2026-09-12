@@ -831,3 +831,230 @@ export function bacaRekod(html: string): CrmRow[] {
 
   return out;
 }
+
+// ============================================================== auto-cari API
+//
+// CRM baharu ialah aplikasi sebenar dengan API, jadi datanya tidak terbenam
+// dalam HTML seperti CRM lama. Daripada meminta manusia menyiasat bentuknya,
+// dashboard mencari sendiri: kutip alamat API yang disebut dalam halaman,
+// gabung dengan senarai nama lazim, cuba setiap satu, dan pilih yang
+// memulangkan rekod paling banyak.
+
+/** Nama endpoint yang lazim digunakan oleh CRM recovery. */
+const CALON_ENDPOINT = [
+  "/api/cases",
+  "/api/queue",
+  "/api/recovery",
+  "/api/recoveries",
+  "/api/orders",
+  "/api/followups",
+  "/api/follow-ups",
+  "/api/customers",
+  "/api/records",
+  "/api/abandoned",
+  "/api/checkouts",
+  "/api/data",
+  "/api/list",
+  "/api/dashboard",
+];
+
+/**
+ * Alamat dalam JSON terbenam kadang-kadang ditulis dengan garis condong
+ * yang di-escape. Ditulis begini (dan bukan sebagai regex) supaya tiada
+ * kekeliruan escape semasa fail ini disunting.
+ */
+const ESCAPED_SLASH = String.fromCharCode(92) + "/";
+
+/** Kutip alamat /api/... yang disebut dalam skrip halaman. */
+function endpointDalamHalaman(html: string): string[] {
+  const skrip = (html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) ?? [])
+    .join(" ")
+    .split(ESCAPED_SLASH)
+    .join("/");
+  const jumpa = skrip.match(/["'`](\/api\/[A-Za-z0-9_\-./]{2,60})["'`]/g) ?? [];
+  return Array.from(new Set(jumpa.map((x) => x.slice(1, -1)))).filter(
+    (u) => !/\/auth\/|logout|login/i.test(u)
+  );
+}
+
+/** Cari senarai objek dalam apa-apa bentuk balasan JSON. */
+function cariSenarai(data: unknown): Record<string, unknown>[] | null {
+  if (Array.isArray(data)) {
+    const objek = data.filter(
+      (x) => x && typeof x === "object" && !Array.isArray(x)
+    ) as Record<string, unknown>[];
+    return objek.length > 0 ? objek : null;
+  }
+  if (!data || typeof data !== "object") return null;
+
+  // Cuba nama lazim dahulu, kemudian mana-mana nilai yang berbentuk senarai.
+  const obj = data as Record<string, unknown>;
+  const utama = [
+    "rows", "items", "data", "cases", "orders", "records", "results",
+    "list", "queue", "customers", "edges",
+  ];
+  for (const k of [...utama, ...Object.keys(obj)]) {
+    const hasil = k in obj ? cariSenarai(obj[k]) : null;
+    if (hasil) return hasil;
+  }
+  return null;
+}
+
+/** Cari nilai mengikut nama medan, tidak kira huruf besar/kecil, sehingga 3 lapis. */
+function nilaiMedan(
+  o: Record<string, unknown>,
+  kunci: string[],
+  dalam = 0
+): unknown {
+  const kecil = kunci.map((k) => k.toLowerCase().replace(/[_-]/g, ""));
+
+  for (const [k, v] of Object.entries(o)) {
+    const nk = k.toLowerCase().replace(/[_-]/g, "");
+    if (kecil.includes(nk) && v !== null && v !== undefined && v !== "") {
+      // Objek wang Shopify: { amount: "2001.0" }
+      if (typeof v === "object" && !Array.isArray(v)) {
+        const dalamnya = nilaiMedan(v as Record<string, unknown>, kunci, dalam + 1);
+        if (dalamnya !== undefined) return dalamnya;
+        continue;
+      }
+      return v;
+    }
+  }
+
+  if (dalam >= 2) return undefined;
+  for (const v of Object.values(o)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const hasil = nilaiMedan(v as Record<string, unknown>, kunci, dalam + 1);
+      if (hasil !== undefined) return hasil;
+    }
+  }
+  return undefined;
+}
+
+const teksNilai = (v: unknown): string =>
+  v === null || v === undefined ? "" : String(v).trim();
+
+/**
+ * Tukar apa-apa senarai objek JSON menjadi rekod recovery.
+ *
+ * Medan dikesan melalui NAMA, bukan kedudukan — sama seperti cara lajur
+ * sheet dikesan melalui tajuknya. Jadi CRM boleh menamakan medannya
+ * `customer_name`, `customerName` atau `name`, dan ia tetap dibaca.
+ */
+export function bacaRekodJsonAm(data: unknown): CrmRow[] {
+  const senarai = cariSenarai(data);
+  if (!senarai) return [];
+
+  const keluar: CrmRow[] = [];
+  const nampak = new Set<string>();
+
+  for (const o of senarai) {
+    const idMentah = teksNilai(
+      nilaiMedan(o, ["id", "orderId", "order_id", "caseId", "ref", "reference", "name", "orderName"])
+    );
+    const nama = teksNilai(
+      nilaiMedan(o, ["customerName", "customer_name", "customer", "name", "displayName", "fullName", "nama"])
+    );
+    const hubungan = teksNilai(
+      nilaiMedan(o, ["email", "customerEmail", "phone", "customerPhone", "contact", "whatsapp", "telefon"])
+    );
+
+    // Nombor dalam id ialah kunci paling stabil; kalau tiada, guna
+    // gabungan nama + hubungan supaya rekod tidak jadi dua.
+    const digit = idMentah.match(/(\d{4,})/)?.[1];
+    const kunci =
+      digit ??
+      (idMentah || nama || hubungan
+        ? (idMentah || `${nama}|${hubungan}`).toLowerCase().replace(/\s+/g, "")
+        : "");
+    if (!kunci || nampak.has(kunci)) continue;
+
+    const jumlah = teksNilai(
+      nilaiMedan(o, ["amountRm", "amount_rm", "amount", "total", "totalPrice", "totalPriceSet", "price", "value", "rm", "jumlah"])
+    );
+    const status = teksNilai(
+      nilaiMedan(o, ["status", "state", "stage", "financialStatus", "displayFinancialStatus", "keadaan"])
+    );
+    const tarikhMentah = teksNilai(
+      nilaiMedan(o, ["contactedAt", "contacted_at", "date", "createdAt", "created_at", "orderDate", "tarikh", "updatedAt"])
+    );
+    const nota = teksNilai(
+      nilaiMedan(o, ["note", "notes", "item", "product", "title", "remark", "catatan", "lineItems"])
+    );
+    const handler = teksNilai(
+      nilaiMedan(o, ["handler", "agent", "assignee", "pic", "owner"])
+    );
+
+    // Rekod tanpa nama DAN tanpa hubungan hampir pasti bukan kes customer.
+    if (!nama && !hubungan) continue;
+
+    nampak.add(kunci);
+    keluar.push({
+      source_id: `crm-${kunci}`,
+      customer_name: nama || null,
+      customer_contact: hubungan || null,
+      status: status || null,
+      amount_rm: nombor(jumlah),
+      contacted_at: tarikh(tarikhMentah),
+      handler: handler ? handler.toUpperCase() : null,
+      note: nota || null,
+    });
+  }
+
+  return keluar;
+}
+
+export interface HasilCariApi {
+  /** Alamat yang akhirnya digunakan. */
+  url: string | null;
+  rekod: CrmRow[];
+  /** Setiap alamat yang dicuba — untuk panel pemeriksaan. */
+  cubaan: { url: string; status: number; bil: number }[];
+}
+
+/**
+ * Cari endpoint data CRM secara automatik dan baca rekodnya.
+ *
+ * Alamat yang disebut dalam halaman didahulukan kerana itulah yang CRM
+ * sendiri gunakan; senarai nama lazim hanya sebagai sandaran.
+ */
+export async function cariDataApi(
+  html: string,
+  cookie: string
+): Promise<HasilCariApi> {
+  const calon = Array.from(
+    new Set([...endpointDalamHalaman(html), ...CALON_ENDPOINT])
+  ).slice(0, 18);
+
+  const cubaan: { url: string; status: number; bil: number }[] = [];
+  let terbaik: HasilCariApi = { url: null, rekod: [], cubaan };
+
+  for (const laluan of calon) {
+    try {
+      const res = await fetch(new URL(laluan, CRM_URL).toString(), {
+        headers: {
+          Cookie: cookie,
+          Accept: "application/json",
+          "User-Agent": "Mozilla/5.0 (compatible; MasdoraDashboard/1.0)",
+        },
+        cache: "no-store",
+      });
+
+      if (!res.ok || !/json/i.test(res.headers.get("content-type") ?? "")) {
+        cubaan.push({ url: laluan, status: res.status, bil: 0 });
+        continue;
+      }
+
+      const rekod = bacaRekodJsonAm(await res.json());
+      cubaan.push({ url: laluan, status: res.status, bil: rekod.length });
+
+      if (rekod.length > terbaik.rekod.length) {
+        terbaik = { url: laluan, rekod, cubaan };
+      }
+    } catch {
+      cubaan.push({ url: laluan, status: 0, bil: 0 });
+    }
+  }
+
+  return terbaik;
+}
