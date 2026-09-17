@@ -21,6 +21,8 @@ export interface GraphicTask {
   requestFrom: string;
   doneBy: string;
   assignDate: string;
+  /** Tarikh diberi dalam bentuk ISO, untuk penapisan bulan. */
+  assignIso: string | null;
   deadline: string;
   deadlineIso: string | null;
   status: TaskStatus;
@@ -189,6 +191,9 @@ export async function GET(request: Request) {
         requestFrom: get(cFrom),
         doneBy: get(cBy),
         assignDate: get(cAssign),
+        // Bentuk ISO diperlukan untuk menapis mengikut bulan dengan tepat —
+        // teks "10/08/2026" tidak boleh dibandingkan secara terus.
+        assignIso: parseDate(get(cAssign)),
         deadline,
         deadlineIso,
         status,

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
+import { monthName } from "@/lib/period";
 import AvatarInitials from "@/components/AvatarInitials";
 import type { Profile } from "@/types/database";
 
@@ -17,6 +18,7 @@ interface GraphicTask {
   requestFrom: string;
   doneBy: string;
   assignDate: string;
+  assignIso: string | null;
   deadline: string;
   deadlineIso: string | null;
   status: TaskStatus;
@@ -24,6 +26,12 @@ interface GraphicTask {
   notes: string;
   overdue: boolean;
   daysLeft: number | null;
+}
+
+/** "2026-08" -> "Ogos 2026" */
+function namaBulan(ym: string): string {
+  const [y, m] = ym.split("-");
+  return `${monthName(Number(m))} ${y}`;
 }
 
 const SHEET_URL =
@@ -97,6 +105,15 @@ export default function TugasanGrafikPage() {
   const [catFilter, setCatFilter] = useState("");
   const [search, setSearch] = useState("");
   const [onlyOverdue, setOnlyOverdue] = useState(false);
+  /**
+   * Bulan yang dipapar, contoh "2026-08". Kosong bermakna semua bulan.
+   *
+   * Tugasan ditapis mengikut tarikh ia DIBERI (assign date), bukan tarikh
+   * akhir — kerana itulah bulan kerja itu masuk kepada designer.
+   */
+  const [monthFilter, setMonthFilter] = useState("");
+  /** Elak menetapkan bulan lalai berulang kali selepas pengguna memilih. */
+  const [monthPicked, setMonthPicked] = useState(false);
 
   const load = useCallback(
     async (fresh = false) => {
@@ -161,9 +178,35 @@ export default function TugasanGrafikPage() {
     [tasks]
   );
 
+  /** "2026-08" bagi satu tugasan — ikut tarikh diberi, gunakan tarikh akhir kalau tiada. */
+  const bulanTugasan = (t: GraphicTask): string | null =>
+    (t.assignIso ?? t.deadlineIso)?.slice(0, 7) ?? null;
+
+  /** Senarai bulan yang benar-benar ADA tugasan, terbaru di atas. */
+  const bulanAda = useMemo(
+    () =>
+      Array.from(
+        new Set(tasks.map(bulanTugasan).filter((b): b is string => !!b))
+      ).sort((a, b) => b.localeCompare(a)),
+    [tasks]
+  );
+
+  /**
+   * Mula pada bulan semasa. Kalau bulan itu tiada tugasan, terus tunjuk
+   * bulan terkini yang ada — supaya designer tidak nampak skrin kosong
+   * tanpa sebab pada awal bulan.
+   */
+  useEffect(() => {
+    if (monthPicked || bulanAda.length === 0) return;
+    const kini = new Date().toISOString().slice(0, 7);
+    setMonthFilter(bulanAda.includes(kini) ? kini : bulanAda[0]);
+    setMonthPicked(true);
+  }, [bulanAda, monthPicked]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return tasks.filter((t) => {
+      if (monthFilter && bulanTugasan(t) !== monthFilter) return false;
       if (statusFilter && t.status !== statusFilter) return false;
       if (byFilter && t.doneBy !== byFilter) return false;
       if (catFilter && t.category !== catFilter) return false;
@@ -174,7 +217,19 @@ export default function TugasanGrafikPage() {
       }
       return true;
     });
-  }, [tasks, statusFilter, byFilter, catFilter, onlyOverdue, search]);
+  }, [tasks, monthFilter, statusFilter, byFilter, catFilter, onlyOverdue, search]);
+
+  /**
+   * Tugasan dalam bulan yang dipapar.
+   *
+   * Kad status dan beban kerja dikira daripada ini — kalau tidak, angkanya
+   * merangkumi sepanjang masa sedangkan senarai di bawah hanya satu bulan,
+   * dan kedua-duanya tidak akan sepadan.
+   */
+  const dalamBulan = useMemo(
+    () => tasks.filter((t) => !monthFilter || bulanTugasan(t) === monthFilter),
+    [tasks, monthFilter]
+  );
 
   const counts = useMemo(() => {
     const c: Record<TaskStatus, number> = {
@@ -183,20 +238,20 @@ export default function TugasanGrafikPage() {
       proses: 0,
       baru: 0,
     };
-    tasks
+    dalamBulan
       .filter((t) => !byFilter || t.doneBy === byFilter)
       .forEach((t) => c[t.status]++);
     return c;
-  }, [tasks, byFilter]);
+  }, [dalamBulan, byFilter]);
 
-  const overdueCount = tasks.filter(
+  const overdueCount = dalamBulan.filter(
     (t) => t.overdue && (!byFilter || t.doneBy === byFilter)
   ).length;
 
-  /** Beban kerja setiap designer (tugasan belum selesai). */
+  /** Beban kerja setiap designer (tugasan belum selesai) dalam bulan itu. */
   const workload = useMemo(() => {
     const map = new Map<string, { open: number; done: number }>();
-    tasks.forEach((t) => {
+    dalamBulan.forEach((t) => {
       if (!t.doneBy) return;
       const cur = map.get(t.doneBy) ?? { open: 0, done: 0 };
       if (t.status === "selesai") cur.done += 1;
@@ -206,7 +261,7 @@ export default function TugasanGrafikPage() {
     return Array.from(map.entries())
       .map(([name, v]) => ({ name, ...v }))
       .sort((a, b) => b.open - a.open);
-  }, [tasks]);
+  }, [dalamBulan]);
   const maxOpen = Math.max(1, ...workload.map((w) => w.open));
 
   return (
@@ -335,6 +390,53 @@ export default function TugasanGrafikPage() {
           </div>
         </motion.div>
       )}
+
+      {/* Pemilih bulan — untuk melihat semula kerja bulan-bulan lepas */}
+      <motion.div {...cardMotion} className="card flex flex-wrap items-center gap-2">
+        <button
+          className="btn-secondary"
+          disabled={bulanAda.indexOf(monthFilter) >= bulanAda.length - 1}
+          onClick={() => {
+            const i = bulanAda.indexOf(monthFilter);
+            if (i >= 0 && i < bulanAda.length - 1) setMonthFilter(bulanAda[i + 1]);
+          }}
+        >
+          ‹ Bulan Sebelum
+        </button>
+
+        <select
+          className="input min-w-[180px]"
+          value={monthFilter}
+          onChange={(e) => {
+            setMonthFilter(e.target.value);
+            setMonthPicked(true);
+          }}
+        >
+          <option value="">Semua Bulan</option>
+          {bulanAda.map((b) => (
+            <option key={b} value={b}>
+              {namaBulan(b)}
+            </option>
+          ))}
+        </select>
+
+        <button
+          className="btn-secondary"
+          disabled={bulanAda.indexOf(monthFilter) <= 0}
+          onClick={() => {
+            const i = bulanAda.indexOf(monthFilter);
+            if (i > 0) setMonthFilter(bulanAda[i - 1]);
+          }}
+        >
+          Bulan Depan ›
+        </button>
+
+        <span className="ml-auto text-xs text-muted">
+          {monthFilter
+            ? `${dalamBulan.length} tugasan dalam ${namaBulan(monthFilter)}`
+            : `${tasks.length} tugasan sepanjang masa`}
+        </span>
+      </motion.div>
 
       <motion.div {...cardMotion} className="card flex flex-wrap items-end gap-4">
         <div>
