@@ -14,6 +14,9 @@ import {
   julatMinggu,
   julatBulan,
   lengkapkanSasaran,
+  statusHantarHarian,
+  hariCuti,
+  type StatusHantar,
 } from "@/lib/period";
 import AvatarInitials from "@/components/AvatarInitials";
 import type {
@@ -31,6 +34,23 @@ const cardMotion = {
 };
 
 const MANAGEMENT_ROLES = ["manager", "ceo"];
+
+/** Paparan status penghantaran harian. */
+const LABEL_STATUS: Record<StatusHantar, string> = {
+  cuti: "Cuti",
+  tepat: "Tepat masa",
+  lewat: "Lewat",
+  belum: "Belum hantar",
+  menunggu: "Menunggu",
+};
+
+const PILL_STATUS: Record<StatusHantar, string> = {
+  cuti: "pill-kosong",
+  tepat: "pill-hijau",
+  lewat: "pill-oren",
+  belum: "pill-merah",
+  menunggu: "pill-kuning",
+};
 const HARI = ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"];
 
 function hariIni(): string {
@@ -74,6 +94,7 @@ interface BarisAhli {
   bilKerja: number;
   capaiHari: number;
   submission: DailySubmission | null;
+  status: StatusHantar;
   /** Kerja yang jauh ketinggalan bulan ini — untuk disenaraikan kepada manager. */
   risiko: { title: string; capai: number; sasaran: number; unit: string }[];
 }
@@ -164,6 +185,7 @@ export default function TeamTodoReport() {
       .filter((p) => !deptFilter || p.dept_code === deptFilter)
       .map((p) => {
         const mine = templates.filter((t) => t.user_id === p.id);
+        const sub = subs.find((x) => x.user_id === p.id) ?? null;
 
         let nHari = 0, sHari = 0;
         let nMinggu = 0, sMinggu = 0;
@@ -209,20 +231,29 @@ export default function TeamTodoReport() {
           pctHari: nHari ? Math.round(sHari / nHari) : 0,
           pctMinggu: nMinggu ? Math.round(sMinggu / nMinggu) : 0,
           pctBulan: nBulan ? Math.round(sBulan / nBulan) : 0,
-          submission: subs.find((s) => s.user_id === p.id) ?? null,
+          submission: sub,
+          status: statusHantarHarian(tarikh, sub?.submitted_at),
           risiko,
         };
       })
       .sort((a, b) => {
         // Yang belum hantar naik atas supaya mudah dikejar.
-        const aS = a.submission ? 1 : 0;
-        const bS = b.submission ? 1 : 0;
+        const berat: Record<StatusHantar, number> = {
+          belum: 0, lewat: 1, menunggu: 2, tepat: 3, cuti: 4,
+        };
+        const aS = berat[a.status];
+        const bS = berat[b.status];
         if (aS !== bS) return aS - bS;
         return a.pctHari - b.pctHari;
       });
-  }, [profiles, templates, logsHari, logsMinggu, logsBulan, subs, deptFilter]);
+  }, [profiles, templates, logsHari, logsMinggu, logsBulan, subs, deptFilter, tarikh]);
 
-  const belumHantar = rows.filter((r) => !r.submission).length;
+  // Ahad hari cuti — tiada laporan diperlukan, jadi ia tidak dikira
+  // sebagai "belum hantar".
+  const cuti = hariCuti(tarikh);
+  const belumHantar = cuti
+    ? 0
+    : rows.filter((r) => r.status === "belum" || r.status === "lewat").length;
   const purataHari = rows.length
     ? Math.round(rows.reduce((s, r) => s + r.pctHari, 0) / rows.length)
     : 0;
@@ -287,13 +318,13 @@ export default function TeamTodoReport() {
           index={0}
           label="Belum Hantar"
           value={String(belumHantar)}
-          caption={`daripada ${rows.length} ahli`}
+          caption={cuti ? "hari cuti — tiada laporan" : `daripada ${rows.length} ahli`}
           accent="from-masdora-alert/20 to-masdora-alert/5 border-masdora-alert/25"
         />
         <Stat
           index={1}
           label="Sudah Hantar"
-          value={String(rows.length - belumHantar)}
+          value={String(rows.filter((r) => r.submission).length)}
           caption="laporan hari ini"
           accent="from-masdora-olive/25 to-masdora-olive/5 border-masdora-olive/35"
         />
@@ -358,12 +389,8 @@ export default function TeamTodoReport() {
                     <MiniPct label="Bulan" pct={r.pctBulan} />
                   </div>
 
-                  <span
-                    className={`pill ${
-                      r.submission ? "pill-hijau" : "pill-merah"
-                    }`}
-                  >
-                    {r.submission ? "Sudah hantar" : "Belum hantar"}
+                  <span className={`pill ${PILL_STATUS[r.status]}`}>
+                    {LABEL_STATUS[r.status]}
                   </span>
                   <span className="text-slate-500">{isOpen ? "▲" : "▼"}</span>
                 </button>
@@ -450,8 +477,9 @@ export default function TeamTodoReport() {
       )}
 
       <p className="text-center text-xs text-muted">
-        Ahli melaporkan kuantiti kerja setiap hari. Sasaran ditetapkan oleh
-        Marketing Manager dan tidak boleh diubah oleh ahli.
+        Laporan wajib dihantar sebelum 5:00 petang setiap hari kecuali Ahad.
+        Sasaran ditetapkan oleh Marketing Manager dan tidak boleh diubah oleh
+        ahli.
       </p>
     </div>
   );

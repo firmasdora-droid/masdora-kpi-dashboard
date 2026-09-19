@@ -23,6 +23,9 @@ import {
   shiftWeek,
   tempohRange,
   quarterOfMonth,
+  lengkapkanSasaran,
+  hariKerjaDalamJulat,
+  statusHantarHarian,
   type PilihanTempoh,
   type TempohRange,
 } from "@/lib/period";
@@ -31,6 +34,9 @@ import {
   CONTENT_ACCOUNTS,
   type ContentPlan,
   type Profile,
+  type TaskTemplate,
+  type TaskLog,
+  type DailySubmission,
   type Sale,
   type Todo,
   type WeeklySubmission,
@@ -173,6 +179,9 @@ export default function LaporanMingguanPage() {
   const [issues, setIssues] = useState<CsIssue[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignItem[]>([]);
   const [plans, setPlans] = useState<ContentPlan[]>([]);
+  const [tugas, setTugas] = useState<TaskTemplate[]>([]);
+  const [logTugas, setLogTugas] = useState<TaskLog[]>([]);
+  const [hantarHarian, setHantarHarian] = useState<DailySubmission[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -217,6 +226,9 @@ export default function LaporanMingguanPage() {
       { data: saleRows, error: saleErr },
       { data: recoveryRows, error: recErr },
       { data: planRows, error: planErr },
+      { data: tugasRows },
+      { data: logRows },
+      { data: hantarRows },
     ] = await Promise.all([
       supabase.from("profiles").select("*").eq("active", true).order("full_name"),
       // To-do disimpan mengikut tahun/bulan/minggu, bukan tarikh — jadi ia
@@ -255,6 +267,17 @@ export default function LaporanMingguanPage() {
         .lte("post_date", range.endIso)
         .order("post_date")
         .order("post_time", { nullsFirst: false }),
+      supabase.from("task_templates").select("*").eq("active", true).order("sort_order"),
+      supabase
+        .from("task_logs")
+        .select("*")
+        .gte("log_date", range.startIso)
+        .lte("log_date", range.endIso),
+      supabase
+        .from("daily_submissions")
+        .select("*")
+        .gte("log_date", range.startIso)
+        .lte("log_date", range.endIso),
     ]);
 
     if (saleErr) warn.push("Jualan: " + saleErr.message);
@@ -273,6 +296,12 @@ export default function LaporanMingguanPage() {
     setSales((saleRows as Sale[]) ?? []);
     setRecovery((recoveryRows as RecoveryRecord[]) ?? []);
     setPlans((planRows as ContentPlan[]) ?? []);
+    setTugas((tugasRows as TaskTemplate[]) ?? []);
+    setLogTugas((logRows as TaskLog[]) ?? []);
+    setHantarHarian((hantarRows as DailySubmission[]) ?? []);
+    setTugas((tugasRows as TaskTemplate[]) ?? []);
+    setLogTugas((logRows as TaskLog[]) ?? []);
+    setHantarHarian((hantarRows as DailySubmission[]) ?? []);
 
     // Setiap sumber Google Sheet gagal secara berasingan, supaya satu sheet
     // yang bermasalah tidak mematikan seluruh laporan.
@@ -355,21 +384,86 @@ export default function LaporanMingguanPage() {
         }),
     [team, todos, subs]
   );
-  // Untuk tempoh panjang, kira jumlah penghantaran merentas semua minggu.
-  const submittedCount =
-    period.jenis === "minggu"
-      ? todoRows.filter((r) => r.sub?.submitted_at).length
-      : todoRows.reduce((s, r) => s + r.bilHantar, 0);
-  const onTimeCount =
-    period.jenis === "minggu"
-      ? todoRows.filter((r) => r.sub?.on_time).length
-      : todoRows.reduce((s, r) => s + r.bilTepat, 0);
+  // ---------- To-Do List pasukan ----------
+  /**
+   * Pencapaian setiap ahli terhadap sasaran kerja mereka dalam tempoh ini.
+   *
+   * Sasaran tempoh = sasaran harian x bilangan hari kerja (bukan Ahad)
+   * dalam julat. Untuk kerja yang hanya ada sasaran bulanan, sasaran
+   * bulanan digunakan terus apabila tempoh itu memang satu bulan penuh.
+   */
+  const hariKerja = useMemo(
+    () => hariKerjaDalamJulat(range.startIso, range.endIso),
+    [range.startIso, range.endIso]
+  );
 
+  const todoAhli = useMemo(() => {
+    const jum = (uid: string, tid: number) =>
+      logTugas
+        .filter((l) => l.user_id === uid && l.template_id === tid)
+        .reduce((s, l) => s + Number(l.qty ?? 0), 0);
+
+    return team
+      .map((p) => {
+        const mine = tugas.filter((t) => t.user_id === p.id);
+        const kerja = mine.map((t) => {
+          const s = lengkapkanSasaran(t);
+          // Sasaran bagi tempoh ini. Sasaran harian didarab dengan hari
+          // kerja; kalau tiada sasaran harian, sasaran bulanan digunakan
+          // apabila tempoh meliputi sekurang-kurangnya satu bulan.
+          const sasaranTempoh =
+            s.harian !== null
+              ? s.harian * hariKerja
+              : s.bulanan !== null && hariKerja >= 20
+              ? s.bulanan * Math.max(1, Math.round(hariKerja / 26))
+              : s.mingguan !== null
+              ? s.mingguan * Math.max(1, Math.round(hariKerja / 6))
+              : null;
+          const capai = jum(p.id, t.id);
+          return {
+            title: t.title,
+            unit: t.unit,
+            capai,
+            sasaran: sasaranTempoh,
+            pct:
+              sasaranTempoh && sasaranTempoh > 0
+                ? Math.round((capai / sasaranTempoh) * 100)
+                : null,
+          };
+        });
+
+        const adaSasaran = kerja.filter((k) => k.pct !== null);
+        const purata = adaSasaran.length
+          ? Math.round(
+              adaSasaran.reduce((s, k) => s + Math.min(100, k.pct!), 0) /
+                adaSasaran.length
+            )
+          : 0;
+
+        const hantar = hantarHarian.filter((h) => h.user_id === p.id).length;
+
+        return { profile: p, kerja, purata, hantar };
+      })
+      .sort((a, b) => a.purata - b.purata);
+  }, [team, tugas, logTugas, hantarHarian, hariKerja]);
+
+  /**
+   * Penghantaran harian: setiap ahli sepatutnya hantar sekali setiap hari
+   * kerja (Isnin-Sabtu) sebelum 5:00 petang.
+   */
+  const jangkaanHantar = team.length * hariKerja;
+  const submittedCount = hantarHarian.length;
+  const onTimeCount = hantarHarian.filter(
+    (h) => statusHantarHarian(h.log_date, h.submitted_at) === "tepat"
+  ).length;
 
   const avgPct =
-    todoRows.length > 0
-      ? Math.round(todoRows.reduce((s, r) => s + r.pct, 0) / todoRows.length)
+    todoAhli.length > 0
+      ? Math.round(
+          todoAhli.reduce((s, r) => s + r.purata, 0) / todoAhli.length
+        )
       : 0;
+
 
   // ---------- Jualan ----------
   const nameById = useMemo(() => {
@@ -769,13 +863,13 @@ export default function LaporanMingguanPage() {
                 />
                 <Kotak
                   label="Penghantaran To-Do"
-                  nilai={period.jenis === "minggu" ? `${submittedCount}/${todoRows.length}` : num(submittedCount)}
-                  kecil={`${onTimeCount} tepat masa`}
+                  nilai={`${num(submittedCount)}/${num(jangkaanHantar)}`}
+                  kecil={`${num(onTimeCount)} tepat masa (sebelum 5 petang)`}
                 />
                 <Kotak
-                  label="Purata Kerja Siap"
+                  label="Purata Sasaran Dicapai"
                   nilai={`${avgPct}%`}
-                  kecil={`${todos.length} tugasan direkod`}
+                  kecil={`${num(tugas.length)} kerja ditetapkan`}
                 />
                 <Kotak
                   label="Konten Disiarkan"
@@ -802,41 +896,82 @@ export default function LaporanMingguanPage() {
             {/* ---- 2. To-Do List Team ---- */}
             <Seksyen
               no="2"
-              tajuk="Weekly To-Do List Team"
-              nota="Tarikh akhir penghantaran: Jumaat sebelum 5:00 petang."
+              tajuk="To-Do List Team (Terperinci)"
+              nota={`Penghantaran harian sebelum 5:00 petang, kecuali hari Ahad (cuti). Tempoh ini mengandungi ${hariKerja} hari kerja. Sasaran ditetapkan oleh Marketing Manager dan tidak boleh diubah oleh ahli; ahli hanya memasukkan kuantiti kerja.`}
             >
-              {todoRows.length === 0 ? (
+              {todoAhli.length === 0 ? (
                 <Kosong>Tiada ahli team aktif direkod.</Kosong>
               ) : (
-                <Jadual
-                  kepala={[
-                    "Nama",
-                    "Jawatan",
-                    "Tugasan",
-                    "Siap",
-                    "Tangguh",
-                    "% Siap",
-                    "Status Hantar",
-                  ]}
-                  baris={todoRows.map((r) => [
-                    r.profile.full_name,
-                    r.profile.position_code ?? "-",
-                    num(r.total),
-                    num(r.siap),
-                    r.tangguh > 0 ? num(r.tangguh) : "-",
-                    `${r.pct}%`,
-                    period.jenis !== "minggu"
-                      ? `${r.bilHantar} hantar · ${r.bilTepat} tepat masa`
-                      : r.sub?.submitted_at
-                      ? r.sub.on_time
-                        ? "Tepat masa"
-                        : "Lewat"
-                      : r.total > 0
-                      ? "Lupa tekan hantar"
-                      : "Tiada aktiviti",
-                  ])}
-                  tebalAkhir
-                />
+                <>
+                  <Jadual
+                    kepala={[
+                      "Nama",
+                      "Jawatan",
+                      "Bil. Kerja",
+                      "Hari Dihantar",
+                      "% Purata Sasaran",
+                    ]}
+                    baris={todoAhli.map((r) => [
+                      r.profile.full_name,
+                      r.profile.position_code ?? "-",
+                      num(r.kerja.length),
+                      `${num(r.hantar)} / ${num(hariKerja)}`,
+                      `${r.purata}%`,
+                    ])}
+                    tebalAkhir
+                  />
+
+                  {todoAhli
+                    .filter((r) => r.kerja.length > 0)
+                    .map((r) => (
+                      <div key={r.profile.id} className="cetak-blok mt-4">
+                        <div className="mb-1 flex items-baseline justify-between border-b border-slate-200 pb-1">
+                          <h4 className="text-[12px] font-black text-slate-900">
+                            {r.profile.full_name}
+                            <span className="ml-2 text-[10px] font-normal text-slate-500">
+                              {r.profile.position_code ?? "-"}
+                            </span>
+                          </h4>
+                          <span className="text-[10px] font-bold text-slate-700">
+                            Purata {r.purata}% · {num(r.hantar)}/{num(hariKerja)}{" "}
+                            hari dihantar
+                          </span>
+                        </div>
+                        <Jadual
+                          kepala={[
+                            "Kerja",
+                            "Unit",
+                            "Sasaran Tempoh",
+                            "Dicapai",
+                            "Baki",
+                            "% Capai",
+                          ]}
+                          baris={r.kerja.map((k) => [
+                            k.title,
+                            k.unit,
+                            k.sasaran === null ? "-" : num(k.sasaran),
+                            num(k.capai),
+                            k.sasaran === null
+                              ? "-"
+                              : num(Math.max(0, k.sasaran - k.capai)),
+                            k.pct === null ? "-" : `${k.pct}%`,
+                          ])}
+                          tebalAkhir
+                        />
+                      </div>
+                    ))}
+
+                  {todoAhli.filter((r) => r.kerja.length === 0).length > 0 && (
+                    <p className="mt-3 text-[11px] text-slate-500">
+                      Tiada senarai kerja ditetapkan lagi untuk:{" "}
+                      {todoAhli
+                        .filter((r) => r.kerja.length === 0)
+                        .map((r) => r.profile.full_name)
+                        .join(", ")}
+                      .
+                    </p>
+                  )}
+                </>
               )}
             </Seksyen>
 

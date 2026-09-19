@@ -3,7 +3,7 @@
  *
  * Dashboard log masuk sendiri ke masdora-crm-masdora.zocomputer.io, baca jadual, dan
  * kemas kini jadual `recovery_records`. Tiada apa yang perlu diubah pada
- * CRM — Maisarah cuma kemas kini seperti biasa.
+ * CRM — Najjati cuma kemas kini seperti biasa.
  *
  * Env yang diperlukan di Vercel:
  *   CRM_EMAIL + CRM_PASSWORD   — akaun CRM untuk dashboard (server sahaja)
@@ -342,7 +342,7 @@ export async function GET(request: Request) {
     );
   }
 
-  // ---------- Jualan pulih masuk ke jualan Maisarah ----------
+  // ---------- Jualan pulih masuk ke jualan Najjati ----------
   const jualan = await catatJualanPulih(admin, rekod);
 
   return Response.json({
@@ -365,11 +365,11 @@ function sudahPulih(status: string | null): boolean {
 }
 
 /**
- * Masukkan setiap kes yang berjaya dipulihkan sebagai jualan Maisarah.
+ * Masukkan setiap kes yang berjaya dipulihkan sebagai jualan Najjati.
  *
  * Kenapa menulis ke jadual `sales` dan bukan mengira di paparan: dengan
  * cara ini ia terus muncul di SEMUA tempat yang sudah membaca jadual itu —
- * leaderboard jualan, Dashboard Utama Maisarah, dan Laporan Mingguan PDF —
+ * leaderboard jualan, Dashboard Utama Najjati, dan Laporan Mingguan PDF —
  * tanpa perlu mengubah mana-mana satu.
  *
  * `source_ref` unik menghalang jualan berganda: penyegerakan boleh berjalan
@@ -382,21 +382,22 @@ async function catatJualanPulih(
   const pulih = rekod.filter((r) => sudahPulih(r.status) && r.amount_rm > 0);
   if (pulih.length === 0) return { dicatat: 0, jumlahRm: 0 };
 
-  // Cari Maisarah. Kod handler diutamakan kerana nama boleh berubah ejaan.
-  const { data: mai } = await admin
+  // Recovery dikendalikan oleh Najjati, jadi jualan pulih menjadi
+  // jualannya. Kod handler diutamakan kerana ejaan nama boleh berubah.
+  const { data: pemilik } = await admin
     .from("profiles")
     .select("id, full_name")
-    .or("handler_code.eq.MAI,full_name.ilike.%maisarah%")
+    .or("handler_code.eq.TI,full_name.ilike.%najjati%")
     .eq("active", true)
     .limit(1)
     .maybeSingle<{ id: string; full_name: string }>();
 
-  if (!mai) {
+  if (!pemilik) {
     return {
       dicatat: 0,
       jumlahRm: 0,
       nota:
-        "Jualan pulih tidak dicatat: akaun Maisarah tidak dijumpai (handler_code 'MAI' atau nama mengandungi 'maisarah').",
+        "Jualan pulih tidak dicatat: akaun Najjati tidak dijumpai (handler_code 'TI' atau nama mengandungi 'najjati').",
     };
   }
 
@@ -405,12 +406,12 @@ async function catatJualanPulih(
   const { error } = await admin.from("sales").upsert(
     pulih.map((r) => ({
       source_ref: `recovery-${r.source_id}`,
-      user_id: mai.id,
+      user_id: pemilik.id,
       date: r.contacted_at ?? hariIni,
       amount_rm: r.amount_rm,
       platform: "whatsapp" as const,
       note: `Recovery: ${r.customer_name ?? "customer"}`,
-      created_by: mai.id,
+      created_by: pemilik.id,
     })),
     { onConflict: "source_ref" }
   );

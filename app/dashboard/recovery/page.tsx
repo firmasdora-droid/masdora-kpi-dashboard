@@ -89,7 +89,7 @@ function tierOf(status: string | null): Tier {
   if (/(void|refund|cancel|lost|gagal|fail|tolak|reject|batal)/.test(s))
     return "gagal";
 
-  // Sedang disusuli oleh Maisarah
+  // Sedang disusuli oleh Najjati
   if (/(contact|hubung|follow|progress|ongoing|proses)/.test(s))
     return "proses";
 
@@ -102,7 +102,7 @@ function tierOf(status: string | null): Tier {
 /**
  * Status berkesan bagi satu kes.
  *
- * CRM ialah satu-satunya sumber status — Maisarah kemas kini di sana
+ * CRM ialah satu-satunya sumber status — Najjati kemas kini di sana
  * sahaja, dan dashboard ikut. Lajur `team_status` yang lama sengaja
  * DIABAIKAN supaya nilai lama tidak menimpa apa yang CRM katakan.
  */
@@ -154,7 +154,7 @@ export default function RecoveryPage() {
           const tambahan = jp?.nota
             ? ` ${jp.nota}`
             : jp?.dicatat
-            ? ` ${jp.dicatat} jualan pulih dicatat untuk Maisarah (RM ${Number(
+            ? ` ${jp.dicatat} jualan pulih dicatat untuk Najjati (RM ${Number(
                 jp.jumlahRm
               ).toLocaleString("ms-MY")}).`
             : "";

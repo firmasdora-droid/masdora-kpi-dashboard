@@ -238,6 +238,14 @@ select seed_task('%harith%', 'Shopee wall video (shoot/edit/update)',       'vid
 select seed_task('%harith%', 'Shopee product catalogue video',              'video', null, 30, null, 2, null);
 select seed_task('%harith%', 'Shoot & edit story IG + TikTok',              'story', null, null, 12, 3, null);
 
+-- ============ MEGAT — Graphic Designer ============
+select seed_task('%megat%', 'Design banner TikTok',        'design', null, null, 30,  1, null);
+select seed_task('%megat%', 'Card printing',               'pcs',    null, null, 500, 2, null);
+select seed_task('%megat%', 'Design frame TikTok Live',    'design', null, null, 3,   3, null);
+select seed_task('%megat%', 'Design sticker TikTok Live',  'design', null, null, 3,   4, null);
+select seed_task('%megat%', 'Draft design 1/2 Dinar',      'draft',  null, null, 3,   5, null);
+select seed_task('%megat%', 'New product listing',         'photo',  15,   null, null, 6, null);
+
 drop function if exists seed_task(text, text, text, numeric, numeric, numeric, int, text);
 
 -- ---------------------------------------------------------------- 4) Semak

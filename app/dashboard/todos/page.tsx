@@ -18,6 +18,8 @@ import {
   julatMinggu,
   julatBulan,
   lengkapkanSasaran,
+  statusHantarHarian,
+  bakiMasaHantar,
   HARI_KERJA_SEMINGGU,
   HARI_KERJA_SEBULAN,
 } from "@/lib/period";
@@ -351,6 +353,8 @@ export default function TodoListPage() {
 
   const minggu = julatMinggu(tarikh);
   const bulan = julatBulan(tarikh);
+  const statusHantar = statusHantarHarian(tarikh, submission?.submitted_at);
+  const baki = bakiMasaHantar(tarikh);
 
   return (
     <div className="space-y-6">
@@ -387,47 +391,84 @@ export default function TodoListPage() {
       <motion.div
         {...cardMotion}
         className={`rounded-2xl border p-5 ${
-          submission?.submitted_at
+          statusHantar === "cuti"
+            ? "border-white/10 bg-white/[0.04]"
+            : statusHantar === "tepat"
             ? "border-masdora-olive/40 bg-gradient-to-br from-masdora-olive/20 to-masdora-olive/5"
+            : statusHantar === "lewat"
+            ? "border-masdora-yellow/45 bg-gradient-to-br from-masdora-yellow/20 to-masdora-yellow/5"
             : "border-masdora-alert/45 bg-gradient-to-br from-masdora-alert/20 to-masdora-alert/5"
         }`}
       >
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        {statusHantar === "cuti" ? (
           <div>
-            <p
-              className={`font-bold ${
-                submission?.submitted_at ? "text-emerald-200" : "text-red-200"
-              }`}
-            >
-              {submission?.submitted_at
-                ? `✅ Laporan ${tarikhCantik(tarikh)} sudah dihantar`
-                : `⚠️ Laporan ${tarikhCantik(tarikh)} BELUM dihantar`}
+            <p className="font-bold text-slate-200">
+              🌴 {tarikhCantik(tarikh)} — hari cuti
             </p>
-            <p className="mt-0.5 text-xs text-slate-300">
-              {submission?.submitted_at
-                ? new Date(submission.submitted_at).toLocaleString("ms-MY")
-                : "Isi kuantiti kerja anda, kemudian tekan butang di sebelah. Manager tidak akan nampak laporan anda sehingga ia dihantar."}
+            <p className="mt-0.5 text-xs text-slate-400">
+              Tiada laporan diperlukan pada hari Ahad. Kalau anda tetap bekerja
+              hari ini, anda masih boleh isi kuantiti dan menghantarnya.
             </p>
           </div>
-          <motion.button
-            className="btn-primary px-6 py-3"
-            onClick={hantarLaporan}
-            animate={
-              submission?.submitted_at
-                ? {}
-                : {
-                    boxShadow: [
-                      "0 0 0px rgba(242,97,34,0)",
-                      "0 0 20px rgba(242,97,34,0.6)",
-                      "0 0 0px rgba(242,97,34,0)",
-                    ],
-                  }
-            }
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            {submission?.submitted_at ? "Hantar Semula" : "Hantar Laporan"}
-          </motion.button>
-        </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p
+                className={`font-bold ${
+                  statusHantar === "tepat"
+                    ? "text-emerald-200"
+                    : statusHantar === "lewat"
+                    ? "text-amber-200"
+                    : "text-red-200"
+                }`}
+              >
+                {statusHantar === "tepat" &&
+                  `✅ Laporan ${tarikhCantik(tarikh)} dihantar tepat masa`}
+                {statusHantar === "lewat" &&
+                  (submission
+                    ? `⚠️ Laporan ${tarikhCantik(tarikh)} dihantar LEWAT`
+                    : `⚠️ Laporan ${tarikhCantik(tarikh)} TIDAK dihantar — tarikh akhir sudah lepas`)}
+                {statusHantar === "menunggu" &&
+                  `⏳ Laporan ${tarikhCantik(tarikh)} belum dihantar`}
+                {statusHantar === "belum" &&
+                  `⚠️ Laporan hari ini BELUM dihantar — sudah lepas 5 petang`}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-300">
+                {submission?.submitted_at ? (
+                  new Date(submission.submitted_at).toLocaleString("ms-MY")
+                ) : (
+                  <>
+                    Tarikh akhir: <strong>sebelum 5:00 petang</strong> setiap
+                    hari kecuali Ahad.
+                    {baki && (
+                      <span className="ml-1 font-bold text-amber-300">
+                        Baki masa: {baki}
+                      </span>
+                    )}
+                  </>
+                )}
+              </p>
+            </div>
+            <motion.button
+              className="btn-primary px-6 py-3"
+              onClick={hantarLaporan}
+              animate={
+                submission
+                  ? {}
+                  : {
+                      boxShadow: [
+                        "0 0 0px rgba(242,97,34,0)",
+                        "0 0 20px rgba(242,97,34,0.6)",
+                        "0 0 0px rgba(242,97,34,0)",
+                      ],
+                    }
+              }
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              {submission ? "Hantar Semula" : "Hantar Laporan"}
+            </motion.button>
+          </div>
+        )}
       </motion.div>
 
       {/* ---------- Ringkasan hari ini ---------- */}
@@ -590,6 +631,7 @@ export default function TodoListPage() {
       </motion.div>
 
       <p className="text-center text-[11px] text-muted">
+        Laporan wajib dihantar sebelum 5:00 petang setiap hari kecuali Ahad.
         Sasaran ditetapkan oleh Marketing Manager dan tidak boleh diubah di
         sini. Sasaran mingguan &amp; bulanan yang bertanda &ldquo;dikira&rdquo;
         dianggarkan daripada sasaran harian ({HARI_KERJA_SEMINGGU} hari

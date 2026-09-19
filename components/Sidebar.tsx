@@ -49,10 +49,11 @@ export default function Sidebar({
 
   const manager = isManager(role);
 
-  // Pautan khas Maisarah. Dikenal pasti melalui kod handler ATAU nama,
-  // supaya ia berfungsi walaupun handler_code belum diset dalam database.
-  const isMaisarah =
-    handlerCode === "MAI" || /maisarah/i.test(fullName ?? "");
+  // Recovery CRM kini dikendalikan oleh Najjati (sebelum ini Maisarah).
+  // Dikenal pasti melalui kod handler ATAU nama, supaya ia berfungsi
+  // walaupun handler_code belum diset dalam database.
+  const isCrmOwner =
+    handlerCode === "TI" || /najjati/i.test(fullName ?? "");
 
   // Team Customer Service — mereka sahaja yang perlu Isu Pelanggan & Laporan Chat.
   const isCS = ["CS_AGENT", "CS_WEB", "CS_SHOPEE", "CS_TIKTOK"].includes(
@@ -143,16 +144,16 @@ export default function Sidebar({
           href: "/dashboard/recovery",
           label: "Recovery CRM",
           icon: "🔄",
-          show: isMaisarah || manager || role === "ceo",
+          show: isCrmOwner || manager || role === "ceo",
         },
         {
           href: "https://masdora-crm-masdora.zocomputer.io/",
           label: "Buka Sistem CRM",
           icon: "🔗",
-          // Maisarah yang menguruskan recovery, tetapi Marketing Manager & CEO
+          // Najjati yang menguruskan recovery, tetapi Marketing Manager & CEO
           // juga perlu boleh masuk sistem CRM itu untuk memantau. Sama dengan
           // kebenaran halaman "Recovery CRM" di atas.
-          show: isMaisarah || manager || role === "ceo",
+          show: isCrmOwner || manager || role === "ceo",
           external: true,
         },
       ],

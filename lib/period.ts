@@ -302,3 +302,72 @@ export function julatBulan(iso: string): { mula: string; tamat: string } {
   const p = (n: number) => String(n).padStart(2, "0");
   return { mula: `${y}-${p(m)}-01`, tamat: `${y}-${p(m)}-${p(akhir)}` };
 }
+
+// ------------------------------------------------- penghantaran harian
+
+/** Laporan harian mesti dihantar sebelum jam ini. */
+export const JAM_AKHIR_HANTAR = 17; // 5:00 petang
+
+/**
+ * Ahad ialah hari cuti — tiada laporan diperlukan.
+ *
+ * Sebab itu juga sasaran mingguan dikira atas 6 hari (Isnin–Sabtu), bukan 7.
+ */
+export function hariCuti(iso: string): boolean {
+  return new Date(iso + "T00:00:00").getDay() === 0;
+}
+
+export type StatusHantar = "cuti" | "tepat" | "lewat" | "belum" | "menunggu";
+
+/**
+ * Status penghantaran bagi satu hari.
+ *
+ *   cuti     — Ahad, tiada laporan diperlukan
+ *   tepat    — dihantar sebelum 5 petang pada hari itu
+ *   lewat    — dihantar selepas 5 petang, atau hari sudah lepas tanpa hantar
+ *   menunggu — hari ini, masih ada masa sebelum 5 petang
+ *   belum    — hari ini, sudah lepas 5 petang dan belum dihantar
+ */
+export function statusHantarHarian(
+  iso: string,
+  submittedAt: string | null | undefined
+): StatusHantar {
+  if (hariCuti(iso)) return "cuti";
+
+  const hadTarikh = new Date(iso + "T00:00:00");
+  hadTarikh.setHours(JAM_AKHIR_HANTAR, 0, 0, 0);
+
+  if (submittedAt) {
+    return new Date(submittedAt) <= hadTarikh ? "tepat" : "lewat";
+  }
+
+  const sekarang = new Date();
+  if (sekarang <= hadTarikh) return "menunggu";
+  return sekarang.toDateString() === hadTarikh.toDateString()
+    ? "belum"
+    : "lewat";
+}
+
+/** Berapa lama lagi sebelum 5 petang hari ini. Null kalau sudah lepas/cuti. */
+export function bakiMasaHantar(iso: string): string | null {
+  if (hariCuti(iso)) return null;
+  const had = new Date(iso + "T00:00:00");
+  had.setHours(JAM_AKHIR_HANTAR, 0, 0, 0);
+  const ms = had.getTime() - Date.now();
+  if (ms <= 0) return null;
+  const jam = Math.floor(ms / 3_600_000);
+  const minit = Math.floor((ms % 3_600_000) / 60_000);
+  return jam > 0 ? `${jam} jam ${minit} minit lagi` : `${minit} minit lagi`;
+}
+
+/** Bilangan hari kerja (bukan Ahad) dalam satu julat tarikh. */
+export function hariKerjaDalamJulat(mula: string, tamat: string): number {
+  let n = 0;
+  const d = new Date(mula + "T00:00:00");
+  const akhir = new Date(tamat + "T00:00:00");
+  while (d <= akhir) {
+    if (d.getDay() !== 0) n++;
+    d.setDate(d.getDate() + 1);
+  }
+  return n;
+}

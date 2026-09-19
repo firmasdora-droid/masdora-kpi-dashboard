@@ -2,7 +2,7 @@
 
 CRM: **https://masdora-crm-masdora.zocomputer.io**
 
-Maisarah kemas kini rekod dalam CRM seperti biasa → dashboard log masuk
+Najjati kemas kini rekod dalam CRM seperti biasa → dashboard log masuk
 sendiri, tarik data, dan papar bilangan dihubungi / berjaya pulih / tidak
 berjaya / jumlah RM.
 
@@ -14,20 +14,20 @@ berjaya / jumlah RM.
 
 CRM ini menggunakan **akaun individu** (emel + kata laluan), bukan satu kata
 laluan kongsi seperti CRM lama. Dashboard log masuk menggunakan **akaun
-Maisarah**, kerana CRM itu bukan di bawah kawalan Masdora dan akaun baharu
+Najjati**, kerana CRM itu bukan di bawah kawalan Masdora dan akaun baharu
 tidak boleh dicipta.
 
 Dashboard hanya **membaca** — ia tidak pernah menulis ke CRM.
 
 ### Kesan yang perlu diketahui
 
-Kerana akaun Maisarah yang digunakan:
+Kerana akaun Najjati yang digunakan:
 
-- **Kalau Maisarah tukar kata laluan CRM, penyegerakan akan berhenti.**
+- **Kalau Najjati tukar kata laluan CRM, penyegerakan akan berhenti.**
   Gejalanya: halaman Recovery berkata "Log masuk CRM gagal". Pembetulannya:
   kemas kini `CRM_PASSWORD` di Vercel kepada kata laluan baharu, kemudian
   Redeploy.
-- Log CRM akan menunjukkan capaian dashboard sebagai capaian Maisarah.
+- Log CRM akan menunjukkan capaian dashboard sebagai capaian Najjati.
   Ini tidak menjejaskan apa-apa, cuma perlu diingat kalau ada audit.
 
 ### Masukkan akaun itu di Vercel
@@ -37,8 +37,8 @@ Kerana akaun Maisarah yang digunakan:
 
    | Key | Value |
    |---|---|
-   | `CRM_EMAIL` | emel Maisarah di CRM |
-   | `CRM_PASSWORD` | kata laluan CRM Maisarah |
+   | `CRM_EMAIL` | emel Najjati di CRM |
+   | `CRM_PASSWORD` | kata laluan CRM Najjati |
 
    Environments: tandakan **Production** dan **Preview**.
 
@@ -52,7 +52,7 @@ Selesai. Buka halaman **Recovery CRM** — data akan masuk sendiri.
 ## Bagaimana ia berfungsi
 
 ```
-Maisarah kemas kini CRM
+Najjati kemas kini CRM
         │
         ▼
 masdora-crm-masdora.zocomputer.io
@@ -61,7 +61,7 @@ masdora-crm-masdora.zocomputer.io
         ▼
 /api/crm-sync  ──►  jadual recovery_records  ──►  halaman Recovery CRM
                                               ├►  Laporan PDF
-                                              └►  Jualan pulih -> jualan Maisarah
+                                              └►  Jualan pulih -> jualan Najjati
 ```
 
 Penyegerakan berlaku:
@@ -100,7 +100,7 @@ yang CRM sebenarnya balas.
 | Mesej | Maksud | Tindakan |
 |---|---|---|
 | `CRM_EMAIL dan CRM_PASSWORD belum ditetapkan` | Langkah 2 belum dibuat | Tetapkan env var, kemudian Redeploy |
-| Log masuk gagal | Kata laluan Maisarah sudah ditukar, atau akaun dinyahaktifkan | Kemas kini `CRM_PASSWORD` di Vercel, kemudian Redeploy |
+| Log masuk gagal | Kata laluan Najjati sudah ditukar, atau akaun dinyahaktifkan | Kemas kini `CRM_PASSWORD` di Vercel, kemudian Redeploy |
 | `Tiada baris data dikenali` | Log masuk berjaya, tetapi bentuk data berbeza | Hantar tangkapan skrin panel Periksa |
 
 Panel Periksa terhad kepada Marketing Manager & CEO kerana ia memaparkan
@@ -110,7 +110,7 @@ data customer.
 
 ## Nota keselamatan
 
-- Akaun CRM (Maisarah) disimpan sebagai env var Vercel, dibaca di sebelah pelayan
+- Akaun CRM (Najjati) disimpan sebagai env var Vercel, dibaca di sebelah pelayan
   sahaja. Ia tidak pernah dihantar ke pelayar dan tidak kelihatan dalam
   mana-mana halaman dashboard.
 - Aliran data **satu hala**: CRM → dashboard. Dashboard tidak boleh
