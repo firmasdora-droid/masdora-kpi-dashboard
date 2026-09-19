@@ -380,3 +380,41 @@ export interface ContentPlan {
   created_at: string;
   updated_at: string;
 }
+
+/** Kerja tetap + sasarannya. Ditetapkan manager; ahli tidak boleh ubah. */
+export interface TaskTemplate {
+  id: number;
+  user_id: string;
+  title: string;
+  unit: string;
+  target_daily: number | null;
+  target_weekly: number | null;
+  target_monthly: number | null;
+  /** Kerja manager dikunci; kerja yang ahli tambah sendiri tidak. */
+  locked: boolean;
+  active: boolean;
+  sort_order: number;
+  note: string | null;
+  created_at: string;
+}
+
+/** Kuantiti kerja yang dilaporkan pada satu hari. */
+export interface TaskLog {
+  id: number;
+  user_id: string;
+  template_id: number;
+  /** "YYYY-MM-DD" */
+  log_date: string;
+  qty: number;
+  note: string | null;
+  updated_at: string;
+}
+
+/** Penghantaran laporan harian. */
+export interface DailySubmission {
+  id: number;
+  user_id: string;
+  log_date: string;
+  submitted_at: string;
+  note: string | null;
+}

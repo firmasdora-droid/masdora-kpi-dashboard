@@ -81,7 +81,7 @@ export default function Sidebar({
         },
         {
           href: "/dashboard/todos",
-          label: "Weekly To-Do List Team",
+          label: "To-Do List",
           icon: "📋",
           show: true,
         },

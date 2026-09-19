@@ -1,21 +1,27 @@
 "use client";
 
+/**
+ * Laporan To-Do harian pasukan — untuk Marketing Manager & CEO.
+ *
+ * Menunjukkan siapa sudah hantar laporan hari ini, dan pencapaian setiap
+ * orang terhadap sasaran harian, mingguan dan bulanan mereka.
+ */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
-  getCurrentYear,
-  getCurrentMonth,
-  getCurrentWeekOfMonth,
-  monthName,
+  julatMinggu,
+  julatBulan,
+  lengkapkanSasaran,
 } from "@/lib/period";
-import WeekPicker, { WeekValue } from "@/components/WeekPicker";
 import AvatarInitials from "@/components/AvatarInitials";
 import type {
+  DailySubmission,
   Department,
   Profile,
-  Todo,
-  WeeklySubmission,
+  TaskLog,
+  TaskTemplate,
 } from "@/types/database";
 
 const cardMotion = {
@@ -24,65 +30,118 @@ const cardMotion = {
   transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] as const },
 };
 
-/** Jawatan pengurusan — mereka tidak perlu isi to-do sendiri. */
 const MANAGEMENT_ROLES = ["manager", "ceo"];
+const HARI = ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"];
 
-interface MemberRow {
+function hariIni(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function tarikhCantik(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${HARI[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+}
+
+function nf(n: number): string {
+  return Number.isInteger(n)
+    ? n.toLocaleString("ms-MY")
+    : n.toLocaleString("ms-MY", { maximumFractionDigits: 2 });
+}
+
+function warnaPct(pct: number): string {
+  if (pct >= 100) return "bg-masdora-olive";
+  if (pct >= 70) return "bg-masdora-yellow";
+  if (pct >= 40) return "bg-masdora-orange";
+  return "bg-masdora-alert";
+}
+
+function teksPct(pct: number): string {
+  if (pct >= 100) return "text-masdora-olive";
+  if (pct >= 70) return "text-amber-200";
+  if (pct >= 40) return "text-masdora-orange";
+  return "text-red-300";
+}
+
+interface BarisAhli {
   profile: Profile;
-  todos: Todo[];
-  submission: WeeklySubmission | null;
-  siap: number;
-  total: number;
-  pct: number;
+  templates: TaskTemplate[];
+  pctHari: number;
+  pctMinggu: number;
+  pctBulan: number;
+  bilKerja: number;
+  capaiHari: number;
+  submission: DailySubmission | null;
+  /** Kerja yang jauh ketinggalan bulan ini — untuk disenaraikan kepada manager. */
+  risiko: { title: string; capai: number; sasaran: number; unit: string }[];
 }
 
 export default function TeamTodoReport() {
   const supabase = createClient();
 
-  const [week, setWeek] = useState<WeekValue>({
-    year: getCurrentYear(),
-    month: getCurrentMonth(),
-    week: getCurrentWeekOfMonth(),
-  });
+  const [tarikh, setTarikh] = useState(hariIni());
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [subs, setSubs] = useState<WeeklySubmission[]>([]);
+  const [templates, setTemplates] = useState<TaskTemplate[]>([]);
+  const [logsHari, setLogsHari] = useState<TaskLog[]>([]);
+  const [logsMinggu, setLogsMinggu] = useState<TaskLog[]>([]);
+  const [logsBulan, setLogsBulan] = useState<TaskLog[]>([]);
+  const [subs, setSubs] = useState<DailySubmission[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deptFilter, setDeptFilter] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
+    const minggu = julatMinggu(tarikh);
+    const bulan = julatBulan(tarikh);
+
     const [
       { data: profileRows },
-      { data: todoRows },
+      { data: tplRows, error: tplErr },
+      { data: lh },
+      { data: lm },
+      { data: lb },
       { data: subRows },
       { data: deptRows },
     ] = await Promise.all([
       supabase.from("profiles").select("*").eq("active", true).order("full_name"),
+      supabase.from("task_templates").select("*").eq("active", true).order("sort_order"),
+      supabase.from("task_logs").select("*").eq("log_date", tarikh),
       supabase
-        .from("todos")
+        .from("task_logs")
         .select("*")
-        .eq("year", week.year)
-        .eq("month", week.month)
-        .eq("week", week.week)
-        .order("sort_order"),
+        .gte("log_date", minggu.mula)
+        .lte("log_date", minggu.tamat),
       supabase
-        .from("weekly_submissions")
+        .from("task_logs")
         .select("*")
-        .eq("year", week.year)
-        .eq("month", week.month)
-        .eq("week", week.week),
+        .gte("log_date", bulan.mula)
+        .lte("log_date", bulan.tamat),
+      supabase.from("daily_submissions").select("*").eq("log_date", tarikh),
       supabase.from("departments").select("*").order("sort_order"),
     ]);
 
+    setError(
+      tplErr
+        ? /task_templates|does not exist/i.test(tplErr.message)
+          ? "Jadual kerja belum disediakan. Sila run fail add-todo-targets.sql dalam Supabase SQL Editor."
+          : "Gagal memuatkan: " + tplErr.message
+        : null
+    );
+
     setProfiles((profileRows as Profile[]) ?? []);
-    setTodos((todoRows as Todo[]) ?? []);
-    setSubs((subRows as WeeklySubmission[]) ?? []);
+    setTemplates((tplRows as TaskTemplate[]) ?? []);
+    setLogsHari((lh as TaskLog[]) ?? []);
+    setLogsMinggu((lm as TaskLog[]) ?? []);
+    setLogsBulan((lb as TaskLog[]) ?? []);
+    setSubs((subRows as DailySubmission[]) ?? []);
     setDepartments((deptRows as Department[]) ?? []);
     setLoading(false);
-  }, [supabase, week]);
+  }, [supabase, tarikh]);
 
   useEffect(() => {
     load();
@@ -94,61 +153,112 @@ export default function TeamTodoReport() {
     return m;
   }, [departments]);
 
-  /** Hanya ahli team yang wajib isi — pengurusan dikecualikan. */
-  const rows: MemberRow[] = useMemo(() => {
+  const rows: BarisAhli[] = useMemo(() => {
+    const jum = (logs: TaskLog[], uid: string, tid: number) =>
+      logs
+        .filter((l) => l.user_id === uid && l.template_id === tid)
+        .reduce((s, l) => s + Number(l.qty ?? 0), 0);
+
     return profiles
       .filter((p) => !MANAGEMENT_ROLES.includes(p.role))
       .filter((p) => !deptFilter || p.dept_code === deptFilter)
       .map((p) => {
-        const mine = todos.filter((t) => t.user_id === p.id);
-        const siap = mine.filter((t) => t.status === "siap").length;
-        const total = mine.length;
-        const pct =
-          total > 0
-            ? Math.round(mine.reduce((s, t) => s + (t.pct ?? 0), 0) / total)
-            : 0;
+        const mine = templates.filter((t) => t.user_id === p.id);
+
+        let nHari = 0, sHari = 0;
+        let nMinggu = 0, sMinggu = 0;
+        let nBulan = 0, sBulan = 0;
+        let capaiHari = 0;
+        const risiko: BarisAhli["risiko"] = [];
+
+        mine.forEach((t) => {
+          const s = lengkapkanSasaran(t);
+          const cH = jum(logsHari, p.id, t.id);
+          const cM = jum(logsMinggu, p.id, t.id);
+          const cB = jum(logsBulan, p.id, t.id);
+
+          if (s.harian && s.harian > 0) {
+            nHari++;
+            sHari += Math.min(100, (cH / s.harian) * 100);
+            if (cH >= s.harian) capaiHari++;
+          }
+          if (s.mingguan && s.mingguan > 0) {
+            nMinggu++;
+            sMinggu += Math.min(100, (cM / s.mingguan) * 100);
+          }
+          if (s.bulanan && s.bulanan > 0) {
+            nBulan++;
+            sBulan += Math.min(100, (cB / s.bulanan) * 100);
+            // Di bawah 40% bulan ini — cukup jauh untuk perlu perhatian.
+            if ((cB / s.bulanan) * 100 < 40) {
+              risiko.push({
+                title: t.title,
+                capai: cB,
+                sasaran: s.bulanan,
+                unit: t.unit,
+              });
+            }
+          }
+        });
+
         return {
           profile: p,
-          todos: mine,
+          templates: mine,
+          bilKerja: mine.length,
+          capaiHari,
+          pctHari: nHari ? Math.round(sHari / nHari) : 0,
+          pctMinggu: nMinggu ? Math.round(sMinggu / nMinggu) : 0,
+          pctBulan: nBulan ? Math.round(sBulan / nBulan) : 0,
           submission: subs.find((s) => s.user_id === p.id) ?? null,
-          siap,
-          total,
-          pct,
+          risiko,
         };
       })
       .sort((a, b) => {
-        // Yang belum hantar naik atas supaya mudah dikejar
-        const aSub = a.submission?.submitted_at ? 1 : 0;
-        const bSub = b.submission?.submitted_at ? 1 : 0;
-        if (aSub !== bSub) return aSub - bSub;
-        return b.pct - a.pct;
+        // Yang belum hantar naik atas supaya mudah dikejar.
+        const aS = a.submission ? 1 : 0;
+        const bS = b.submission ? 1 : 0;
+        if (aS !== bS) return aS - bS;
+        return a.pctHari - b.pctHari;
       });
-  }, [profiles, todos, subs, deptFilter]);
+  }, [profiles, templates, logsHari, logsMinggu, logsBulan, subs, deptFilter]);
 
-  const submitted = rows.filter((r) => r.submission?.submitted_at).length;
-  const onTime = rows.filter((r) => r.submission?.on_time).length;
-  const notSubmitted = rows.length - submitted;
-  // Ada isi tugasan tetapi tidak tekan "Hantar" — kerja ada, cuma lupa hantar.
-  const forgotSubmit = rows.filter(
-    (r) => !r.submission?.submitted_at && r.total > 0
-  ).length;
-  const noActivity = notSubmitted - forgotSubmit;
-  const avgPct =
-    rows.length > 0
-      ? Math.round(rows.reduce((s, r) => s + r.pct, 0) / rows.length)
-      : 0;
+  const belumHantar = rows.filter((r) => !r.submission).length;
+  const purataHari = rows.length
+    ? Math.round(rows.reduce((s, r) => s + r.pctHari, 0) / rows.length)
+    : 0;
+  const purataBulan = rows.length
+    ? Math.round(rows.reduce((s, r) => s + r.pctBulan, 0) / rows.length)
+    : 0;
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-white">Weekly To-Do List Team</h2>
+        <h2 className="text-xl font-bold text-white">To-Do List Pasukan</h2>
         <p className="text-sm text-muted">
-          Apa yang team kemas kini — dipapar terus, tanpa perlu tanya.
+          Laporan harian setiap ahli dan pencapaian mereka terhadap sasaran.
         </p>
       </div>
 
+      {error && (
+        <motion.div
+          {...cardMotion}
+          className="card border-masdora-alert/40 text-sm text-red-200"
+        >
+          {error}
+        </motion.div>
+      )}
+
       <motion.div {...cardMotion} className="card flex flex-wrap items-end gap-4">
-        <WeekPicker value={week} onChange={setWeek} />
+        <div>
+          <label className="label">Tarikh</label>
+          <input
+            type="date"
+            className="input"
+            value={tarikh}
+            max={hariIni()}
+            onChange={(e) => setTarikh(e.target.value)}
+          />
+        </div>
         <div>
           <label className="label">Jabatan</label>
           <select
@@ -167,35 +277,38 @@ export default function TeamTodoReport() {
         <button onClick={load} className="btn-secondary" disabled={loading}>
           {loading ? "Memuatkan..." : "Muat Semula"}
         </button>
+        <span className="ml-auto text-xs text-muted">
+          {tarikhCantik(tarikh)}
+        </span>
       </motion.div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard
+        <Stat
           index={0}
           label="Belum Hantar"
-          value={String(notSubmitted)}
-          caption={`${forgotSubmit} lupa tekan hantar · ${noActivity} tiada aktiviti`}
+          value={String(belumHantar)}
+          caption={`daripada ${rows.length} ahli`}
           accent="from-masdora-alert/20 to-masdora-alert/5 border-masdora-alert/25"
         />
-        <StatCard
+        <Stat
           index={1}
-          label="Hantar Tepat Masa"
-          value={String(onTime)}
-          caption="sebelum Jumaat 5 petang"
+          label="Sudah Hantar"
+          value={String(rows.length - belumHantar)}
+          caption="laporan hari ini"
           accent="from-masdora-olive/25 to-masdora-olive/5 border-masdora-olive/35"
         />
-        <StatCard
+        <Stat
           index={2}
-          label="Jumlah Hantar"
-          value={`${submitted}/${rows.length}`}
-          caption="ahli team"
+          label="Purata Hari Ini"
+          value={`${purataHari}%`}
+          caption="terhadap sasaran harian"
           accent="from-masdora-yellow/18 to-masdora-yellow/5 border-masdora-yellow/25"
         />
-        <StatCard
+        <Stat
           index={3}
-          label="Purata Siap"
-          value={`${avgPct}%`}
-          caption="penyiapan kerja"
+          label="Purata Bulan Ini"
+          value={`${purataBulan}%`}
+          caption="terhadap sasaran bulanan"
           accent="from-masdora-orange/20 to-masdora-orange/5 border-masdora-orange/25"
         />
       </div>
@@ -204,37 +317,25 @@ export default function TeamTodoReport() {
         <p className="text-sm text-muted">Memuatkan...</p>
       ) : rows.length === 0 ? (
         <motion.div {...cardMotion} className="card text-center text-sm text-muted">
-          Tiada ahli team untuk tapisan ini.
+          Tiada ahli untuk tapisan ini.
         </motion.div>
       ) : (
         <div className="space-y-3">
           {rows.map((r, i) => {
             const isOpen = expanded === r.profile.id;
-            const sub = r.submission;
-            // Bezakan dua keadaan yang SANGAT berbeza:
-            //  - ada tugasan tetapi lupa tekan "Hantar"  -> kerja ada, cuma lupa
-            //  - tiada tugasan sama sekali               -> memang tak buat apa-apa
-            const statusPill = sub?.submitted_at
-              ? sub.on_time
-                ? { label: "Tepat masa", cls: "pill-hijau" }
-                : { label: "Lewat", cls: "pill-oren" }
-              : r.total > 0
-              ? { label: "Lupa tekan hantar", cls: "pill-oren" }
-              : { label: "Tiada aktiviti", cls: "pill-merah" };
-
             return (
               <motion.div
                 key={r.profile.id}
                 {...cardMotion}
                 transition={{
                   ...cardMotion.transition,
-                  delay: Math.min(i * 0.04, 0.4),
+                  delay: Math.min(i * 0.04, 0.35),
                 }}
                 className="card"
               >
                 <button
                   onClick={() => setExpanded(isOpen ? null : r.profile.id)}
-                  className="flex w-full items-center gap-3 text-left"
+                  className="flex w-full flex-wrap items-center gap-3 text-left"
                 >
                   <AvatarInitials
                     name={r.profile.full_name}
@@ -246,99 +347,98 @@ export default function TeamTodoReport() {
                       {r.profile.full_name}
                     </p>
                     <p className="truncate text-[11px] text-slate-500">
-                      {r.profile.position_code ?? "-"} · {r.siap}/{r.total} kerja
-                      siap
+                      {r.profile.position_code ?? "-"} · {r.capaiHari}/
+                      {r.bilKerja} kerja capai sasaran harian
                     </p>
-                    <div className="mt-2 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-white/10">
-                      <motion.div
-                        className="h-full rounded-full bg-masdora-olive"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${r.pct}%` }}
-                        transition={{ duration: 0.6, delay: 0.1 }}
-                      />
-                    </div>
                   </div>
-                  <div className="flex flex-shrink-0 flex-col items-end gap-1">
-                    <span className={`pill ${statusPill.cls}`}>
-                      {statusPill.label}
-                    </span>
-                    <span className="text-lg font-black text-white">
-                      {r.pct}%
-                    </span>
+
+                  <div className="flex flex-wrap items-center gap-4">
+                    <MiniPct label="Hari" pct={r.pctHari} />
+                    <MiniPct label="Minggu" pct={r.pctMinggu} />
+                    <MiniPct label="Bulan" pct={r.pctBulan} />
                   </div>
-                  <span className="ml-1 flex-shrink-0 text-slate-500">
-                    {isOpen ? "▲" : "▼"}
+
+                  <span
+                    className={`pill ${
+                      r.submission ? "pill-hijau" : "pill-merah"
+                    }`}
+                  >
+                    {r.submission ? "Sudah hantar" : "Belum hantar"}
                   </span>
+                  <span className="text-slate-500">{isOpen ? "▲" : "▼"}</span>
                 </button>
 
                 {isOpen && (
                   <div className="mt-4 space-y-2 border-t border-white/5 pt-4">
-                    {!sub?.submitted_at && r.total > 0 && (
-                      <div className="rounded-lg border border-masdora-orange/30 bg-masdora-orange/10 p-3">
-                        <p className="text-xs font-bold text-amber-200">
-                          Dia ADA buat kerja ({r.total} tugasan direkod) tetapi
-                          tidak tekan butang &ldquo;Hantar&rdquo;.
-                        </p>
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Minta dia buka Weekly To-Do List Team dan tekan butang
-                          merah &ldquo;Hantar Sekarang&rdquo;.
-                        </p>
-                      </div>
-                    )}
-                    {r.todos.length === 0 ? (
+                    {r.templates.length === 0 ? (
                       <p className="text-sm text-muted">
-                        Belum ada tugasan dimasukkan untuk minggu ini.
+                        Belum ada kerja ditetapkan untuk ahli ini.
                       </p>
                     ) : (
-                      r.todos.map((t) => (
-                        <div
-                          key={t.id}
-                          className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
-                        >
-                          <span
-                            className={`h-2 w-2 flex-shrink-0 rounded-full ${
-                              t.status === "siap"
-                                ? "bg-masdora-olive"
-                                : t.status === "tangguh"
-                                ? "bg-red-400"
-                                : t.status === "proses"
-                                ? "bg-amber-400"
-                                : "bg-slate-500"
-                            }`}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm text-slate-200">
+                      r.templates.map((t) => {
+                        const s = lengkapkanSasaran(t);
+                        const cH = logsHari
+                          .filter(
+                            (l) =>
+                              l.user_id === r.profile.id && l.template_id === t.id
+                          )
+                          .reduce((x, l) => x + Number(l.qty ?? 0), 0);
+                        const cB = logsBulan
+                          .filter(
+                            (l) =>
+                              l.user_id === r.profile.id && l.template_id === t.id
+                          )
+                          .reduce((x, l) => x + Number(l.qty ?? 0), 0);
+
+                        return (
+                          <div
+                            key={t.id}
+                            className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                          >
+                            <span className="min-w-0 flex-1 truncate text-sm text-slate-200">
                               {t.title}
-                            </p>
-                            {t.note && (
-                              <p className="truncate text-[11px] text-slate-500">
-                                {t.note}
-                              </p>
-                            )}
+                              {!t.locked && (
+                                <span className="ml-2 text-[10px] text-slate-500">
+                                  (kerja sendiri)
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              Hari: <strong className="text-white">{nf(cH)}</strong>
+                              {s.harian ? ` / ${nf(s.harian)}` : ""}
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              Bulan:{" "}
+                              <strong className="text-white">{nf(cB)}</strong>
+                              {s.bulanan ? ` / ${nf(s.bulanan)}` : ""}
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              {t.unit}
+                            </span>
                           </div>
-                          <span className="flex-shrink-0 text-[11px] text-slate-500">
-                            {t.day || "-"}
-                          </span>
-                          <span className="flex-shrink-0 text-xs font-bold text-slate-300">
-                            {t.pct}%
-                          </span>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
 
-                    {sub?.notes && (
-                      <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                          Catatan minggu ini
+                    {r.risiko.length > 0 && (
+                      <div className="rounded-lg border border-masdora-alert/30 bg-masdora-alert/10 p-3">
+                        <p className="text-xs font-bold text-red-200">
+                          Jauh ketinggalan bulan ini ({r.risiko.length})
                         </p>
-                        <p className="text-sm text-slate-300">{sub.notes}</p>
+                        <ul className="mt-1 space-y-0.5">
+                          {r.risiko.map((x) => (
+                            <li key={x.title} className="text-[11px] text-slate-300">
+                              {x.title} — {nf(x.capai)} / {nf(x.sasaran)} {x.unit}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
 
-                    {sub?.submitted_at && (
+                    {r.submission && (
                       <p className="text-[11px] text-slate-500">
                         Dihantar pada{" "}
-                        {new Date(sub.submitted_at).toLocaleString("ms-MY")}
+                        {new Date(r.submission.submitted_at).toLocaleString("ms-MY")}
                       </p>
                     )}
                   </div>
@@ -350,15 +450,35 @@ export default function TeamTodoReport() {
       )}
 
       <p className="text-center text-xs text-muted">
-        Tarikh akhir penghantaran: <strong>setiap Jumaat sebelum 5:00 petang</strong>
-        {" · "}
-        {monthName(week.month)} {week.year}, Minggu {week.week}
+        Ahli melaporkan kuantiti kerja setiap hari. Sasaran ditetapkan oleh
+        Marketing Manager dan tidak boleh diubah oleh ahli.
       </p>
     </div>
   );
 }
 
-function StatCard({
+function MiniPct({ label, pct }: { label: string; pct: number }) {
+  return (
+    <div className="w-20">
+      <div className="flex items-baseline justify-between">
+        <span className="text-[10px] uppercase tracking-wider text-slate-500">
+          {label}
+        </span>
+        <span className={`text-[11px] font-black ${teksPct(pct)}`}>{pct}%</span>
+      </div>
+      <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <motion.div
+          className={`h-full rounded-full ${warnaPct(pct)}`}
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(100, pct)}%` }}
+          transition={{ duration: 0.6 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Stat({
   label,
   value,
   caption,

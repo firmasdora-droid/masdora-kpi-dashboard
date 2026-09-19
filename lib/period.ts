@@ -225,3 +225,80 @@ export function tempohRange(p: PilihanTempoh): TempohRange {
 export function quarterOfMonth(month: number): number {
   return Math.floor((month - 1) / 3) + 1;
 }
+
+// ---------------------------------------------------------------- sasaran
+
+/**
+ * Hari bekerja yang diandaikan bila hanya sasaran HARIAN diberi.
+ *
+ * Angka ini diambil daripada sasaran Masdora sendiri: CRM update Najjati
+ * ialah 10/hari dan 260/bulan (260 / 10 = 26 hari), dan sasaran jualan
+ * RM4,000/hari dengan RM100,000/bulan (100,000 / 4,000 = 25 hari). Jadi
+ * ~26 hari sebulan dan 6 hari seminggu.
+ *
+ * Sasaran mingguan/bulanan yang ditetapkan SECARA JELAS sentiasa mengatasi
+ * pengiraan ini.
+ */
+export const HARI_KERJA_SEMINGGU = 6;
+export const HARI_KERJA_SEBULAN = 26;
+
+export interface SasaranTempoh {
+  harian: number | null;
+  mingguan: number | null;
+  bulanan: number | null;
+  /** Sasaran mana yang dikira, bukan ditetapkan manager. */
+  dikira: { mingguan: boolean; bulanan: boolean };
+}
+
+/** Lengkapkan sasaran: yang ditetapkan kekal, yang kosong dikira. */
+export function lengkapkanSasaran(t: {
+  target_daily: number | null;
+  target_weekly: number | null;
+  target_monthly: number | null;
+}): SasaranTempoh {
+  const harian = t.target_daily;
+  const mingguan =
+    t.target_weekly ?? (harian !== null ? harian * HARI_KERJA_SEMINGGU : null);
+  const bulanan =
+    t.target_monthly ?? (harian !== null ? harian * HARI_KERJA_SEBULAN : null);
+
+  return {
+    harian,
+    mingguan,
+    bulanan,
+    dikira: {
+      mingguan: t.target_weekly === null && mingguan !== null,
+      bulanan: t.target_monthly === null && bulanan !== null,
+    },
+  };
+}
+
+/**
+ * Tarikh tempatan dalam bentuk "YYYY-MM-DD".
+ *
+ * JANGAN guna toISOString() untuk ini. Ia menukar kepada UTC, dan di
+ * Malaysia (UTC+8) tengah malam tempatan menjadi 4:00 petang hari
+ * SEBELUMNYA — jadi setiap sempadan minggu tersasar satu hari.
+ */
+function tarikhTempatan(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Julat tarikh minggu kerja (Isnin–Ahad) bagi satu tarikh. */
+export function julatMinggu(iso: string): { mula: string; tamat: string } {
+  const d = new Date(iso + "T00:00:00");
+  const hari = (d.getDay() + 6) % 7; // Isnin = 0
+  const isnin = new Date(d);
+  isnin.setDate(d.getDate() - hari);
+  const ahad = new Date(isnin);
+  ahad.setDate(isnin.getDate() + 6);
+  return { mula: tarikhTempatan(isnin), tamat: tarikhTempatan(ahad) };
+}
+
+/** Julat tarikh bulan bagi satu tarikh. */
+export function julatBulan(iso: string): { mula: string; tamat: string } {
+  const [y, m] = iso.split("-").map(Number);
+  const akhir = new Date(y, m, 0).getDate();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return { mula: `${y}-${p(m)}-01`, tamat: `${y}-${p(m)}-${p(akhir)}` };
+}
