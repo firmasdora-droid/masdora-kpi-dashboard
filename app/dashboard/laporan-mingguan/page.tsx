@@ -30,6 +30,7 @@ import {
   type TempohRange,
 } from "@/lib/period";
 import MasdoraLogomark from "@/components/MasdoraLogomark";
+import { perluTodoList } from "@/lib/roles";
 import {
   CONTENT_ACCOUNTS,
   type ContentPlan,
@@ -346,7 +347,12 @@ export default function LaporanMingguanPage() {
 
   // ---------- To-Do Team ----------
   const team = useMemo(
-    () => profiles.filter((p) => !MANAGEMENT_ROLES.includes(p.role)),
+    () =>
+      profiles
+        .filter((p) => !MANAGEMENT_ROLES.includes(p.role))
+        // Digital Marketing tidak menghantar To-Do List harian, jadi mereka
+        // tidak dikira dalam pencapaian atau "belum hantar".
+        .filter((p) => perluTodoList(p.position_code)),
     [profiles]
   );
 

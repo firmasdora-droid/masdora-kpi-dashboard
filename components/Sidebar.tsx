@@ -4,7 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { isManager, canKeyInSale, type Role } from "@/lib/roles";
+import {
+  isManager,
+  canKeyInSale,
+  isDigitalMarketing,
+  type Role,
+} from "@/lib/roles";
 import AvatarInitials from "@/components/AvatarInitials";
 import MasdoraLogomark from "@/components/MasdoraLogomark";
 import MasdoraWordmark from "@/components/MasdoraWordmark";
@@ -70,6 +75,10 @@ export default function Sidebar({
     positionCode ?? ""
   );
 
+  // Digital Marketing — hanya Content Planner & Prestasi Konten, tiada
+  // To-Do List. Mereka tetap boleh melihat Leaderboard jualan.
+  const isDigital = isDigitalMarketing(positionCode);
+
   const groups: NavGroup[] = [
     {
       title: "Kerja Saya",
@@ -84,7 +93,7 @@ export default function Sidebar({
           href: "/dashboard/todos",
           label: "To-Do List",
           icon: "📋",
-          show: true,
+          show: !isDigital,
         },
         {
           href: "/dashboard/profile",
@@ -108,19 +117,19 @@ export default function Sidebar({
           href: "/dashboard/laporan-whatsapp",
           label: "Laporan WhatsApp",
           icon: "📱",
-          show: true,
+          show: !isDigital,
         },
         {
           href: "/dashboard/content-planner",
           label: "Content Planner",
           icon: "🗓️",
-          show: isContentTeam || manager || role === "ceo",
+          show: isContentTeam || isDigital || manager || role === "ceo",
         },
         {
           href: "/dashboard/prestasi-konten",
           label: "Prestasi Konten",
           icon: "🎬",
-          show: isContentTeam || manager || role === "ceo",
+          show: isContentTeam || isDigital || manager || role === "ceo",
         },
         {
           href: "/dashboard/tugasan-grafik",
@@ -171,7 +180,7 @@ export default function Sidebar({
           href: "/dashboard/campaigns",
           label: "Kempen & Pelancaran",
           icon: "🎉",
-          show: true,
+          show: !isDigital,
         },
         {
           href: "/dashboard/admin/users",

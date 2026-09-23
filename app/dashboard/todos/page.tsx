@@ -24,6 +24,7 @@ import {
   HARI_KERJA_SEBULAN,
 } from "@/lib/period";
 import TeamTodoReport from "@/components/dashboard/TeamTodoReport";
+import { isDigitalMarketing } from "@/lib/roles";
 import type {
   DailySubmission,
   Profile,
@@ -140,6 +141,7 @@ export default function TodoListPage() {
   const supabase = createClient();
 
   const [role, setRole] = useState<string | null>(null);
+  const [positionCode, setPositionCode] = useState<string | null>(null);
   const [roleLoaded, setRoleLoaded] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -163,10 +165,11 @@ export default function TodoListPage() {
       if (user) {
         const { data: prof } = await supabase
           .from("profiles")
-          .select("role")
+          .select("role, position_code")
           .eq("id", user.id)
-          .maybeSingle<Pick<Profile, "role">>();
+          .maybeSingle<Pick<Profile, "role" | "position_code">>();
         setRole(prof?.role ?? null);
+        setPositionCode(prof?.position_code ?? null);
       }
       setRoleLoaded(true);
     })();
@@ -349,6 +352,27 @@ export default function TodoListPage() {
   // Manager & CEO tidak mengisi to-do sendiri — mereka melihat laporan pasukan.
   if (role === "manager" || role === "ceo") {
     return <TeamTodoReport />;
+  }
+
+  // Digital Marketing tidak perlu menghantar To-Do List harian.
+  if (isDigitalMarketing(positionCode)) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-xl font-bold text-white">To-Do List</h2>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+          <p className="text-sm text-slate-200">
+            Jawatan Digital Marketing tidak perlu menghantar To-Do List
+            harian.
+          </p>
+          <p className="mt-2 text-sm text-muted">
+            Kerja anda direkod melalui{" "}
+            <strong className="text-slate-200">Content Planner</strong> dan
+            dinilai melalui{" "}
+            <strong className="text-slate-200">Prestasi Konten</strong>.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const minggu = julatMinggu(tarikh);

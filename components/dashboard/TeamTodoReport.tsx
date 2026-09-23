@@ -19,6 +19,7 @@ import {
   type StatusHantar,
 } from "@/lib/period";
 import AvatarInitials from "@/components/AvatarInitials";
+import { perluTodoList } from "@/lib/roles";
 import type {
   DailySubmission,
   Department,
@@ -182,6 +183,8 @@ export default function TeamTodoReport() {
 
     return profiles
       .filter((p) => !MANAGEMENT_ROLES.includes(p.role))
+      // Digital Marketing tidak menghantar To-Do List harian.
+      .filter((p) => perluTodoList(p.position_code))
       .filter((p) => !deptFilter || p.dept_code === deptFilter)
       .map((p) => {
         const mine = templates.filter((t) => t.user_id === p.id);
