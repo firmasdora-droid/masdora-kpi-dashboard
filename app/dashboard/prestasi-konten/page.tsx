@@ -34,6 +34,44 @@ function nf(n: number): string {
   return n.toLocaleString("ms-MY");
 }
 
+/**
+ * Tahun bagi satu tab sheet, dibaca dari namanya (contoh "SEPT 2026").
+ * Null kalau nama tab tidak menyebut tahun — dashboard kemudian
+ * menganggap semua tab itu satu tempoh sahaja.
+ */
+function tahunTab(nama: string): string | null {
+  const m = nama.match(/(20d{2})/);
+  return m ? m[1] : null;
+}
+
+type Mod = "bulan" | "tahun";
+
+interface Ringkasan {
+  video: number;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+}
+
+const KOSONG: Ringkasan = {
+  video: 0,
+  views: 0,
+  likes: 0,
+  comments: 0,
+  shares: 0,
+};
+
+function tambah(a: Ringkasan, p: ContentPost): Ringkasan {
+  return {
+    video: a.video + 1,
+    views: a.views + p.views,
+    likes: a.likes + p.likes,
+    comments: a.comments + p.comments,
+    shares: a.shares + p.shares,
+  };
+}
+
 export default function PrestasiKontenPage() {
   const supabase = createClient();
 
@@ -44,6 +82,8 @@ export default function PrestasiKontenPage() {
   const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [mod, setMod] = useState<Mod>("bulan");
+  const [yearFilter, setYearFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
   const [handlerFilter, setHandlerFilter] = useState("");
   const [accountFilter, setAccountFilter] = useState("");
@@ -122,6 +162,41 @@ export default function PrestasiKontenPage() {
     if (mine) setHandlerFilter(mine.handler);
   }, [profile, posts, handlerFilter]);
 
+  /** Tahun yang dikesan daripada nama tab sheet. Kosong = tab tiada tahun. */
+  const tahunAda = useMemo(() => {
+    const set = new Set<string>();
+    tabs.forEach((t) => {
+      const y = tahunTab(t);
+      if (y) set.add(y);
+    });
+    return Array.from(set).sort();
+  }, [tabs]);
+
+  // Lalai: tahun bagi bulan yang sedang dipilih, kalau tidak tahun terkini.
+  useEffect(() => {
+    if (yearFilter || tahunAda.length === 0) return;
+    const dariBulan = monthFilter ? tahunTab(monthFilter) : null;
+    setYearFilter(dariBulan ?? tahunAda[tahunAda.length - 1]);
+  }, [tahunAda, monthFilter, yearFilter]);
+
+  /** Tab yang tergolong dalam tahun yang dipilih. */
+  const tabTahun = useMemo(() => {
+    if (tahunAda.length === 0 || !yearFilter) return tabs;
+    return tabs.filter((t) => tahunTab(t) === yearFilter);
+  }, [tabs, tahunAda, yearFilter]);
+
+  // Tukar tahun: kalau bulan yang sedang dipilih bukan milik tahun itu,
+  // pindah ke bulan terkini tahun itu yang ada tontonan.
+  useEffect(() => {
+    if (tabTahun.length === 0) return;
+    if (monthFilter && tabTahun.includes(monthFilter)) return;
+    let best = "";
+    tabTahun.forEach((t) => {
+      if (posts.some((p) => p.monthTab === t && p.views > 0)) best = t;
+    });
+    setMonthFilter(best || tabTahun[tabTahun.length - 1]);
+  }, [tabTahun, monthFilter, posts]);
+
   const handlers = useMemo(
     () => Array.from(new Set(posts.map((p) => p.handler))).sort(),
     [posts]
@@ -131,16 +206,61 @@ export default function PrestasiKontenPage() {
     [posts]
   );
 
+  /**
+   * Video yang dikira. Dalam mod "bulan" hanya bulan yang dipilih; dalam
+   * mod "tahun" semua bulan dalam tahun itu digabungkan.
+   */
   const filtered = useMemo(
     () =>
       posts.filter((p) => {
-        if (monthFilter && p.monthTab !== monthFilter) return false;
+        if (mod === "tahun") {
+          if (!tabTahun.includes(p.monthTab)) return false;
+        } else if (monthFilter && p.monthTab !== monthFilter) {
+          return false;
+        }
         if (handlerFilter && p.handler !== handlerFilter) return false;
         if (accountFilter && p.account !== accountFilter) return false;
         return true;
       }),
-    [posts, monthFilter, handlerFilter, accountFilter]
+    [posts, mod, tabTahun, monthFilter, handlerFilter, accountFilter]
   );
+
+  /**
+   * Pecahan setiap bulan dalam tahun yang dipilih — tontonan, like, komen
+   * dan share. Handler/akaun yang ditapis turut digunakan di sini supaya
+   * jadual ini sepadan dengan nombor di atas.
+   */
+  const perBulan = useMemo(() => {
+    const asas = posts.filter((p) => {
+      if (handlerFilter && p.handler !== handlerFilter) return false;
+      if (accountFilter && p.account !== accountFilter) return false;
+      return true;
+    });
+    return tabTahun.map((tab) => {
+      let r = KOSONG;
+      asas.forEach((p) => {
+        if (p.monthTab === tab) r = tambah(r, p);
+      });
+      return { tab, ...r };
+    });
+  }, [posts, tabTahun, handlerFilter, accountFilter]);
+
+  const jumlahTahun = useMemo(
+    () =>
+      perBulan.reduce<Ringkasan>(
+        (a, b) => ({
+          video: a.video + b.video,
+          views: a.views + b.views,
+          likes: a.likes + b.likes,
+          comments: a.comments + b.comments,
+          shares: a.shares + b.shares,
+        }),
+        KOSONG
+      ),
+    [perBulan]
+  );
+
+  const maxBulanViews = Math.max(1, ...perBulan.map((b) => b.views));
 
   const totalViews = filtered.reduce((s, p) => s + p.views, 0);
   const totalLikes = filtered.reduce((s, p) => s + p.likes, 0);
@@ -269,7 +389,11 @@ export default function PrestasiKontenPage() {
         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
           Jumlah tontonan
           {handlerFilter ? ` · ${handlerFilter}` : ""}
-          {monthFilter ? ` · ${monthFilter}` : ""}
+          {mod === "tahun"
+            ? ` · sepanjang tahun ${yearFilter || ""}`.trimEnd()
+            : monthFilter
+            ? ` · ${monthFilter}`
+            : " · semua bulan"}
         </p>
         <p className="mt-1 text-5xl font-black text-white">{nf(totalViews)}</p>
         <p className="mt-2 text-sm text-slate-400">
@@ -323,14 +447,50 @@ export default function PrestasiKontenPage() {
 
       <motion.div {...cardMotion} className="card flex flex-wrap items-end gap-4">
         <div>
+          <label className="label">Tempoh</label>
+          <div className="flex gap-2">
+            {(
+              [
+                { k: "bulan" as Mod, l: "Satu Bulan" },
+                { k: "tahun" as Mod, l: "Setahun" },
+              ]
+            ).map((t) => (
+              <button
+                key={t.k}
+                onClick={() => setMod(t.k)}
+                className={mod === t.k ? "pill pill-oren" : "pill pill-kosong"}
+              >
+                {t.l}
+              </button>
+            ))}
+          </div>
+        </div>
+        {tahunAda.length > 0 && (
+          <div>
+            <label className="label">Tahun</label>
+            <select
+              className="input"
+              value={yearFilter}
+              onChange={(e) => setYearFilter(e.target.value)}
+            >
+              {tahunAda.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div>
           <label className="label">Bulan</label>
           <select
             className="input"
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
+            disabled={mod === "tahun"}
           >
             <option value="">Semua Bulan</option>
-            {tabs.map((t) => (
+            {tabTahun.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
@@ -368,6 +528,128 @@ export default function PrestasiKontenPage() {
           </select>
         </div>
       </motion.div>
+
+      {/* ---------- Pecahan setiap bulan + jumlah setahun ---------- */}
+      {perBulan.length > 0 && (
+        <motion.div {...cardMotion} className="card">
+          <div className="mb-3">
+            <h3 className="font-semibold text-white">
+              📅 Pecahan Bulanan{tahunAda.length > 0 ? ` ${yearFilter}` : ""}
+            </h3>
+            <p className="text-xs text-muted">
+              Tontonan, like, komen dan share setiap bulan, dengan jumlah
+              setahun di baris terakhir.
+              {handlerFilter ? ` Hanya ${handlerFilter}.` : ""}
+              {accountFilter ? ` Akaun ${accountFilter}.` : ""}
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-slate-400">
+                  <th className="py-2 pr-3 font-bold">Bulan</th>
+                  <th className="py-2 pr-3 text-right font-bold">Video</th>
+                  <th className="py-2 pr-3 text-right font-bold">Tontonan</th>
+                  <th className="py-2 pr-3 text-right font-bold">Like</th>
+                  <th className="py-2 pr-3 text-right font-bold">Komen</th>
+                  <th className="py-2 pr-3 text-right font-bold">Share</th>
+                  <th className="py-2 text-right font-bold">Engagement</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perBulan.map((b) => {
+                  const interaksi = b.likes + b.comments + b.shares;
+                  const kadar = b.views > 0 ? (interaksi / b.views) * 100 : 0;
+                  const aktif = mod === "bulan" && monthFilter === b.tab;
+                  return (
+                    <tr
+                      key={b.tab}
+                      className={`border-b border-white/5 ${
+                        aktif ? "bg-masdora-orange/10" : ""
+                      }`}
+                    >
+                      <td className="py-2 pr-3">
+                        <button
+                          onClick={() => {
+                            setMod("bulan");
+                            setMonthFilter(b.tab);
+                          }}
+                          className="text-left font-semibold text-white hover:text-amber-200"
+                        >
+                          {b.tab}
+                        </button>
+                        {/* Bar perbandingan tontonan antara bulan */}
+                        <div className="mt-1 h-1.5 w-full max-w-[160px] overflow-hidden rounded-full bg-white/5">
+                          <div
+                            className="h-full rounded-full bg-masdora-orange"
+                            style={{
+                              width: `${(b.views / maxBulanViews) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      </td>
+                      <td className="py-2 pr-3 text-right text-slate-300">
+                        {nf(b.video)}
+                      </td>
+                      <td className="py-2 pr-3 text-right font-bold text-white">
+                        {nf(b.views)}
+                      </td>
+                      <td className="py-2 pr-3 text-right text-slate-300">
+                        {nf(b.likes)}
+                      </td>
+                      <td className="py-2 pr-3 text-right text-slate-300">
+                        {nf(b.comments)}
+                      </td>
+                      <td className="py-2 pr-3 text-right text-slate-300">
+                        {nf(b.shares)}
+                      </td>
+                      <td className="py-2 text-right text-slate-300">
+                        {b.views > 0 ? `${kadar.toFixed(2)}%` : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="border-t-2 border-masdora-orange/40 bg-white/5">
+                  <td className="py-2 pr-3 font-black text-white">
+                    JUMLAH SETAHUN
+                    {tahunAda.length > 0 ? ` ${yearFilter}` : ""}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-bold text-white">
+                    {nf(jumlahTahun.video)}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-black text-amber-200">
+                    {nf(jumlahTahun.views)}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-bold text-white">
+                    {nf(jumlahTahun.likes)}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-bold text-white">
+                    {nf(jumlahTahun.comments)}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-bold text-white">
+                    {nf(jumlahTahun.shares)}
+                  </td>
+                  <td className="py-2 text-right font-bold text-white">
+                    {jumlahTahun.views > 0
+                      ? `${(
+                          ((jumlahTahun.likes +
+                            jumlahTahun.comments +
+                            jumlahTahun.shares) /
+                            jumlahTahun.views) *
+                          100
+                        ).toFixed(2)}%`
+                      : "—"}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">
+            Tekan nama bulan untuk melihat butiran bulan itu sahaja.
+          </p>
+        </motion.div>
+      )}
 
       {loading ? (
         <p className="text-sm text-muted">Memuatkan data...</p>
