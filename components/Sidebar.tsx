@@ -183,6 +183,12 @@ export default function Sidebar({
           show: !isDigital,
         },
         {
+          href: "/dashboard/admin/master",
+          label: "Master Setting",
+          icon: "🔐",
+          show: manager,
+        },
+        {
           href: "/dashboard/admin/users",
           label: "Pengurusan Pengguna",
           icon: "👥",

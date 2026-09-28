@@ -26,13 +26,19 @@ export default async function AdminHubPage() {
       <div>
         <h2 className="text-xl font-bold text-white">Admin</h2>
         <p className="text-sm text-muted">
-          Ruangan pengurusan pengguna (khas untuk Manager).
+          Ruangan pengurusan (khas untuk Marketing Manager).
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <AdminNavCard
           index={0}
+          href="/dashboard/admin/master"
+          title="Master Setting"
+          description="Sasaran To-Do, kuantiti harian, sasaran jualan & KPI — semuanya di satu tempat."
+        />
+        <AdminNavCard
+          index={1}
           href="/dashboard/admin/users"
           title="Urus Pengguna"
           description="Lihat senarai pengguna & jemput ahli baru."

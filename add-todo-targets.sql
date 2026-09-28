@@ -136,10 +136,17 @@ create policy ds_update on daily_submissions
 
 -- ---------------------------------------------------------------- 3) Isi kerja
 
--- Padam dahulu kerja BERKUNCI sedia ada supaya fail ini boleh di-run
--- berulang kali tanpa menghasilkan pendua. Kerja yang ahli tambah sendiri
--- (locked = false) TIDAK disentuh.
-delete from task_templates where locked = true;
+-- PENTING — fail ini ialah TETAPAN AWAL sahaja.
+--
+-- Selepas kerja dimasukkan buat kali pertama, Marketing Manager mengubah
+-- sasaran melalui halaman "Master Setting" dalam dashboard. Oleh itu fail
+-- ini TIDAK lagi memadam kerja sedia ada; kalau tidak, setiap kali ia
+-- di-run semula semua tetapan manager akan hilang.
+--
+-- Bagi setiap ahli, kerja hanya dimasukkan jika ahli itu belum mempunyai
+-- sebarang kerja berkunci. Jadi:
+--   * Ahli BARU  -> dapat senarai kerja penuh di bawah.
+--   * Ahli LAMA  -> tetapan semasa (termasuk yang manager ubah) kekal.
 
 -- Pembantu: masukkan satu kerja untuk seorang ahli, dicari melalui nama.
 create or replace function seed_task(
@@ -164,6 +171,14 @@ begin
 
   if uid is null then
     raise notice 'LANGKAU: tiada profil sepadan dengan %', nama_cari;
+    return;
+  end if;
+
+  -- Ahli ini sudah ada senarai kerja: jangan sentuh. Tetapan manager
+  -- di halaman Master Setting ialah sumber kebenaran.
+  if exists (
+    select 1 from task_templates where user_id = uid and locked = true
+  ) then
     return;
   end if;
 
@@ -240,7 +255,7 @@ select seed_task('%harith%', 'Shoot & edit story IG + TikTok',              'sto
 
 -- ============ MEGAT — Graphic Designer ============
 select seed_task('%megat%', 'Design banner TikTok',        'design', null, null, 30,  1, null);
-select seed_task('%megat%', 'Card printing',               'pcs',    null, null, 500, 2, null);
+select seed_task('%megat%', 'Card printing',               'pcs',    null, null, 50,  2, null);
 select seed_task('%megat%', 'Design frame TikTok Live',    'design', null, null, 3,   3, null);
 select seed_task('%megat%', 'Design sticker TikTok Live',  'design', null, null, 3,   4, null);
 select seed_task('%megat%', 'Draft design 1/2 Dinar',      'draft',  null, null, 3,   5, null);
