@@ -52,15 +52,20 @@ interface Ringkasan {
   likes: number;
   comments: number;
   shares: number;
+  /** Bilangan video mengikut akaun, contoh { "Tiktok OS": 12 }. */
+  ikutAkaun: Record<string, number>;
 }
 
-const KOSONG: Ringkasan = {
-  video: 0,
-  views: 0,
-  likes: 0,
-  comments: 0,
-  shares: 0,
-};
+function kosong(): Ringkasan {
+  return {
+    video: 0,
+    views: 0,
+    likes: 0,
+    comments: 0,
+    shares: 0,
+    ikutAkaun: {},
+  };
+}
 
 function tambah(a: Ringkasan, p: ContentPost): Ringkasan {
   return {
@@ -69,6 +74,10 @@ function tambah(a: Ringkasan, p: ContentPost): Ringkasan {
     likes: a.likes + p.likes,
     comments: a.comments + p.comments,
     shares: a.shares + p.shares,
+    ikutAkaun: {
+      ...a.ikutAkaun,
+      [p.account]: (a.ikutAkaun[p.account] ?? 0) + 1,
+    },
   };
 }
 
@@ -237,7 +246,7 @@ export default function PrestasiKontenPage() {
       return true;
     });
     return tabTahun.map((tab) => {
-      let r = KOSONG;
+      let r = kosong();
       asas.forEach((p) => {
         if (p.monthTab === tab) r = tambah(r, p);
       });
@@ -245,18 +254,39 @@ export default function PrestasiKontenPage() {
     });
   }, [posts, tabTahun, handlerFilter, accountFilter]);
 
+  /**
+   * Akaun yang benar-benar ada video dalam tahun ini — satu lajur bagi
+   * setiap satu dalam jadual pecahan bulanan. Disusun ikut jumlah video
+   * supaya akaun paling aktif berada di kiri.
+   */
+  const akaunBulanan = useMemo(() => {
+    const kira = new Map<string, number>();
+    perBulan.forEach((b) =>
+      Object.entries(b.ikutAkaun).forEach(([akaun, v]) =>
+        kira.set(akaun, (kira.get(akaun) ?? 0) + v)
+      )
+    );
+    return Array.from(kira.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([akaun]) => akaun);
+  }, [perBulan]);
+
   const jumlahTahun = useMemo(
     () =>
-      perBulan.reduce<Ringkasan>(
-        (a, b) => ({
+      perBulan.reduce<Ringkasan>((a, b) => {
+        const ikutAkaun = { ...a.ikutAkaun };
+        Object.entries(b.ikutAkaun).forEach(([akaun, v]) => {
+          ikutAkaun[akaun] = (ikutAkaun[akaun] ?? 0) + v;
+        });
+        return {
           video: a.video + b.video,
           views: a.views + b.views,
           likes: a.likes + b.likes,
           comments: a.comments + b.comments,
           shares: a.shares + b.shares,
-        }),
-        KOSONG
-      ),
+          ikutAkaun,
+        };
+      }, kosong()),
     [perBulan]
   );
 
@@ -537,8 +567,9 @@ export default function PrestasiKontenPage() {
               📅 Pecahan Bulanan{tahunAda.length > 0 ? ` ${yearFilter}` : ""}
             </h3>
             <p className="text-xs text-muted">
-              Tontonan, like, komen dan share setiap bulan, dengan jumlah
-              setahun di baris terakhir.
+              Tontonan, like, komen dan share setiap bulan, dengan bilangan
+              video dipecahkan mengikut akaun dan jumlah setahun di baris
+              terakhir.
               {handlerFilter ? ` Hanya ${handlerFilter}.` : ""}
               {accountFilter ? ` Akaun ${accountFilter}.` : ""}
             </p>
@@ -550,6 +581,15 @@ export default function PrestasiKontenPage() {
                 <tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-slate-400">
                   <th className="py-2 pr-3 font-bold">Bulan</th>
                   <th className="py-2 pr-3 text-right font-bold">Video</th>
+                  {akaunBulanan.map((a) => (
+                    <th
+                      key={a}
+                      className="py-2 pr-3 text-right font-bold text-slate-500"
+                      title={`Bilangan video ${a}`}
+                    >
+                      {a}
+                    </th>
+                  ))}
                   <th className="py-2 pr-3 text-right font-bold">Tontonan</th>
                   <th className="py-2 pr-3 text-right font-bold">Like</th>
                   <th className="py-2 pr-3 text-right font-bold">Komen</th>
@@ -589,9 +629,22 @@ export default function PrestasiKontenPage() {
                           />
                         </div>
                       </td>
-                      <td className="py-2 pr-3 text-right text-slate-300">
+                      <td className="py-2 pr-3 text-right font-semibold text-slate-200">
                         {nf(b.video)}
                       </td>
+                      {akaunBulanan.map((a) => {
+                        const v = b.ikutAkaun[a] ?? 0;
+                        return (
+                          <td
+                            key={a}
+                            className={`py-2 pr-3 text-right ${
+                              v > 0 ? "text-slate-400" : "text-slate-700"
+                            }`}
+                          >
+                            {v > 0 ? nf(v) : "—"}
+                          </td>
+                        );
+                      })}
                       <td className="py-2 pr-3 text-right font-bold text-white">
                         {nf(b.views)}
                       </td>
@@ -618,6 +671,14 @@ export default function PrestasiKontenPage() {
                   <td className="py-2 pr-3 text-right font-bold text-white">
                     {nf(jumlahTahun.video)}
                   </td>
+                  {akaunBulanan.map((a) => (
+                    <td
+                      key={a}
+                      className="py-2 pr-3 text-right font-bold text-slate-300"
+                    >
+                      {nf(jumlahTahun.ikutAkaun[a] ?? 0)}
+                    </td>
+                  ))}
                   <td className="py-2 pr-3 text-right font-black text-amber-200">
                     {nf(jumlahTahun.views)}
                   </td>
