@@ -21,6 +21,7 @@ import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { perluTodoList } from "@/lib/roles";
 import { lengkapkanSasaran } from "@/lib/period";
+import { TabAhli, TabStruktur, TabPaparan } from "@/components/dashboard/MasterAhli";
 import type {
   DailySubmission,
   KpiDefinition,
@@ -37,13 +38,23 @@ const cardMotion = {
   transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] as const },
 };
 
-type Tab = "todo" | "kuantiti" | "jualan" | "kpi";
+type Tab =
+  | "todo"
+  | "kuantiti"
+  | "jualan"
+  | "kpi"
+  | "ahli"
+  | "struktur"
+  | "paparan";
 
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "todo", label: "Kerja & Sasaran To-Do", icon: "📋" },
   { key: "kuantiti", label: "Kuantiti Harian", icon: "✏️" },
   { key: "jualan", label: "Sasaran Jualan", icon: "💰" },
   { key: "kpi", label: "KPI Jawatan", icon: "🎯" },
+  { key: "ahli", label: "Ahli & Kata Laluan", icon: "👤" },
+  { key: "struktur", label: "Jabatan & Jawatan", icon: "🏢" },
+  { key: "paparan", label: "Paparan & Akses Menu", icon: "🖥️" },
 ];
 
 function hariIni(): string {
@@ -130,9 +141,10 @@ export default function MasterSetting() {
       <div>
         <h2 className="text-xl font-bold text-white">Master Setting</h2>
         <p className="text-sm text-muted">
-          Semua sasaran dan kuantiti dashboard ditetapkan di sini. Hanya
-          Marketing Manager boleh membuka dan mengubah halaman ini — ahli
-          hanya memasukkan kuantiti kerja mereka.
+          Semua tetapan dashboard berada di sini: sasaran kerja, kuantiti,
+          sasaran jualan, KPI, maklumat ahli, jabatan &amp; jawatan, serta
+          menu yang setiap jawatan boleh lihat. Hanya Marketing Manager
+          boleh membuka dan mengubah halaman ini.
         </p>
       </div>
 
@@ -174,6 +186,11 @@ export default function MasterSetting() {
       {tab === "kpi" && (
         <TabKpi positions={positions} lapor={lapor} setRalat={setRalat} />
       )}
+      {tab === "ahli" && <TabAhli lapor={lapor} setRalat={setRalat} />}
+      {tab === "struktur" && (
+        <TabStruktur lapor={lapor} setRalat={setRalat} />
+      )}
+      {tab === "paparan" && <TabPaparan lapor={lapor} setRalat={setRalat} />}
     </div>
   );
 }

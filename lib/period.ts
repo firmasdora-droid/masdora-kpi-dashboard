@@ -251,16 +251,21 @@ export interface SasaranTempoh {
 }
 
 /** Lengkapkan sasaran: yang ditetapkan kekal, yang kosong dikira. */
-export function lengkapkanSasaran(t: {
-  target_daily: number | null;
-  target_weekly: number | null;
-  target_monthly: number | null;
-}): SasaranTempoh {
+export function lengkapkanSasaran(
+  t: {
+    target_daily: number | null;
+    target_weekly: number | null;
+    target_monthly: number | null;
+  },
+  /* Boleh diubah oleh Marketing Manager dalam Master Setting. */
+  seminggu: number = HARI_KERJA_SEMINGGU,
+  sebulan: number = HARI_KERJA_SEBULAN
+): SasaranTempoh {
   const harian = t.target_daily;
   const mingguan =
-    t.target_weekly ?? (harian !== null ? harian * HARI_KERJA_SEMINGGU : null);
+    t.target_weekly ?? (harian !== null ? harian * seminggu : null);
   const bulanan =
-    t.target_monthly ?? (harian !== null ? harian * HARI_KERJA_SEBULAN : null);
+    t.target_monthly ?? (harian !== null ? harian * sebulan : null);
 
   return {
     harian,
@@ -330,12 +335,14 @@ export type StatusHantar = "cuti" | "tepat" | "lewat" | "belum" | "menunggu";
  */
 export function statusHantarHarian(
   iso: string,
-  submittedAt: string | null | undefined
+  submittedAt: string | null | undefined,
+  /* Jam akhir boleh diubah dalam Master Setting. */
+  jamAkhir: number = JAM_AKHIR_HANTAR
 ): StatusHantar {
   if (hariCuti(iso)) return "cuti";
 
   const hadTarikh = new Date(iso + "T00:00:00");
-  hadTarikh.setHours(JAM_AKHIR_HANTAR, 0, 0, 0);
+  hadTarikh.setHours(jamAkhir, 0, 0, 0);
 
   if (submittedAt) {
     return new Date(submittedAt) <= hadTarikh ? "tepat" : "lewat";
@@ -349,10 +356,13 @@ export function statusHantarHarian(
 }
 
 /** Berapa lama lagi sebelum 5 petang hari ini. Null kalau sudah lepas/cuti. */
-export function bakiMasaHantar(iso: string): string | null {
+export function bakiMasaHantar(
+  iso: string,
+  jamAkhir: number = JAM_AKHIR_HANTAR
+): string | null {
   if (hariCuti(iso)) return null;
   const had = new Date(iso + "T00:00:00");
-  had.setHours(JAM_AKHIR_HANTAR, 0, 0, 0);
+  had.setHours(jamAkhir, 0, 0, 0);
   const ms = had.getTime() - Date.now();
   if (ms <= 0) return null;
   const jam = Math.floor(ms / 3_600_000);

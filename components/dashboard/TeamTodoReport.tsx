@@ -20,6 +20,7 @@ import {
 } from "@/lib/period";
 import AvatarInitials from "@/components/AvatarInitials";
 import { perluTodoList } from "@/lib/roles";
+import { TETAPAN_ASAL, gabungTetapan, type Tetapan } from "@/lib/tetapan";
 import type {
   DailySubmission,
   Department,
@@ -111,6 +112,8 @@ export default function TeamTodoReport() {
   const [logsBulan, setLogsBulan] = useState<TaskLog[]>([]);
   const [subs, setSubs] = useState<DailySubmission[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  /* Jam akhir hantar & hari kerja — ditetapkan dalam Master Setting. */
+  const [tetapan, setTetapan] = useState<Tetapan>(TETAPAN_ASAL);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -129,6 +132,7 @@ export default function TeamTodoReport() {
       { data: lb },
       { data: subRows },
       { data: deptRows },
+      { data: tetapanRows },
     ] = await Promise.all([
       supabase.from("profiles").select("*").eq("active", true).order("full_name"),
       supabase.from("task_templates").select("*").eq("active", true).order("sort_order"),
@@ -145,6 +149,7 @@ export default function TeamTodoReport() {
         .lte("log_date", bulan.tamat),
       supabase.from("daily_submissions").select("*").eq("log_date", tarikh),
       supabase.from("departments").select("*").order("sort_order"),
+      supabase.from("app_settings").select("key, value"),
     ]);
 
     setError(
@@ -162,6 +167,7 @@ export default function TeamTodoReport() {
     setLogsBulan((lb as TaskLog[]) ?? []);
     setSubs((subRows as DailySubmission[]) ?? []);
     setDepartments((deptRows as Department[]) ?? []);
+    if (tetapanRows) setTetapan(gabungTetapan(tetapanRows));
     setLoading(false);
   }, [supabase, tarikh]);
 
@@ -197,7 +203,11 @@ export default function TeamTodoReport() {
         const risiko: BarisAhli["risiko"] = [];
 
         mine.forEach((t) => {
-          const s = lengkapkanSasaran(t);
+          const s = lengkapkanSasaran(
+            t,
+            tetapan.masa.hari_kerja_seminggu,
+            tetapan.masa.hari_kerja_sebulan
+          );
           const cH = jum(logsHari, p.id, t.id);
           const cM = jum(logsMinggu, p.id, t.id);
           const cB = jum(logsBulan, p.id, t.id);
@@ -235,7 +245,11 @@ export default function TeamTodoReport() {
           pctMinggu: nMinggu ? Math.round(sMinggu / nMinggu) : 0,
           pctBulan: nBulan ? Math.round(sBulan / nBulan) : 0,
           submission: sub,
-          status: statusHantarHarian(tarikh, sub?.submitted_at),
+          status: statusHantarHarian(
+            tarikh,
+            sub?.submitted_at,
+            tetapan.masa.jam_akhir_hantar
+          ),
           risiko,
         };
       })
@@ -406,7 +420,11 @@ export default function TeamTodoReport() {
                       </p>
                     ) : (
                       r.templates.map((t) => {
-                        const s = lengkapkanSasaran(t);
+                        const s = lengkapkanSasaran(
+                          t,
+                          tetapan.masa.hari_kerja_seminggu,
+                          tetapan.masa.hari_kerja_sebulan
+                        );
                         const cH = logsHari
                           .filter(
                             (l) =>

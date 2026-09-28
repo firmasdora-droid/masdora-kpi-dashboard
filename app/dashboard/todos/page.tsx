@@ -20,11 +20,10 @@ import {
   lengkapkanSasaran,
   statusHantarHarian,
   bakiMasaHantar,
-  HARI_KERJA_SEMINGGU,
-  HARI_KERJA_SEBULAN,
 } from "@/lib/period";
 import TeamTodoReport from "@/components/dashboard/TeamTodoReport";
 import { isDigitalMarketing } from "@/lib/roles";
+import { TETAPAN_ASAL, gabungTetapan, type Tetapan } from "@/lib/tetapan";
 import type {
   DailySubmission,
   Profile,
@@ -142,6 +141,8 @@ export default function TodoListPage() {
 
   const [role, setRole] = useState<string | null>(null);
   const [positionCode, setPositionCode] = useState<string | null>(null);
+  /* Jam akhir hantar & hari kerja — ditetapkan dalam Master Setting. */
+  const [tetapan, setTetapan] = useState<Tetapan>(TETAPAN_ASAL);
   const [roleLoaded, setRoleLoaded] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -171,6 +172,10 @@ export default function TodoListPage() {
         setRole(prof?.role ?? null);
         setPositionCode(prof?.position_code ?? null);
       }
+      const { data: tetapanRows } = await supabase
+        .from("app_settings")
+        .select("key, value");
+      if (tetapanRows) setTetapan(gabungTetapan(tetapanRows));
       setRoleLoaded(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -259,7 +264,11 @@ export default function TodoListPage() {
     let jumPct = 0;
 
     templates.forEach((t) => {
-      const s = lengkapkanSasaran(t);
+      const s = lengkapkanSasaran(
+        t,
+        tetapan.masa.hari_kerja_seminggu,
+        tetapan.masa.hari_kerja_sebulan
+      );
       if (!s.harian || s.harian <= 0) return;
       adaSasaran++;
       const capai = jumlah(logsHari, t.id);
@@ -377,8 +386,12 @@ export default function TodoListPage() {
 
   const minggu = julatMinggu(tarikh);
   const bulan = julatBulan(tarikh);
-  const statusHantar = statusHantarHarian(tarikh, submission?.submitted_at);
-  const baki = bakiMasaHantar(tarikh);
+  const statusHantar = statusHantarHarian(
+    tarikh,
+    submission?.submitted_at,
+    tetapan.masa.jam_akhir_hantar
+  );
+  const baki = bakiMasaHantar(tarikh, tetapan.masa.jam_akhir_hantar);
 
   return (
     <div className="space-y-6">
@@ -550,7 +563,11 @@ export default function TodoListPage() {
       ) : (
         <div className="space-y-3">
           {templates.map((t, i) => {
-            const s = lengkapkanSasaran(t);
+            const s = lengkapkanSasaran(
+              t,
+              tetapan.masa.hari_kerja_seminggu,
+              tetapan.masa.hari_kerja_sebulan
+            );
             const capaiHari = jumlah(logsHari, t.id);
             const capaiMinggu = jumlah(logsMinggu, t.id);
             const capaiBulan = jumlah(logsBulan, t.id);
@@ -658,8 +675,9 @@ export default function TodoListPage() {
         Laporan wajib dihantar sebelum 5:00 petang setiap hari kecuali Ahad.
         Sasaran ditetapkan oleh Marketing Manager dan tidak boleh diubah di
         sini. Sasaran mingguan &amp; bulanan yang bertanda &ldquo;dikira&rdquo;
-        dianggarkan daripada sasaran harian ({HARI_KERJA_SEMINGGU} hari
-        seminggu, {HARI_KERJA_SEBULAN} hari sebulan).
+        dianggarkan daripada sasaran harian (
+        {tetapan.masa.hari_kerja_seminggu} hari seminggu,{" "}
+        {tetapan.masa.hari_kerja_sebulan} hari sebulan).
       </p>
     </div>
   );

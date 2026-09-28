@@ -13,6 +13,8 @@ import {
 import AvatarInitials from "@/components/AvatarInitials";
 import MasdoraLogomark from "@/components/MasdoraLogomark";
 import MasdoraWordmark from "@/components/MasdoraWordmark";
+import { MENU, type ItemMenu, type KonteksMenu } from "@/lib/menu";
+import type { TetapanAkses } from "@/lib/tetapan";
 
 interface NavItem {
   href: string;
@@ -40,12 +42,18 @@ export default function Sidebar({
   fullName,
   positionName,
   handlerCode,
+  akses = {},
+  tajuk,
 }: {
   role: Role;
   positionCode: string | null;
   fullName: string;
   positionName: string | null;
   handlerCode?: string | null;
+  /** kod jawatan -> menu yang dibenarkan (Master Setting). */
+  akses?: TetapanAkses;
+  /** Teks kecil di bawah logo. */
+  tajuk?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -79,130 +87,50 @@ export default function Sidebar({
   // To-Do List. Mereka tetap boleh melihat Leaderboard jualan.
   const isDigital = isDigitalMarketing(positionCode);
 
-  const groups: NavGroup[] = [
-    {
-      title: "Kerja Saya",
-      items: [
-        {
-          href: "/dashboard",
-          label: "Dashboard Utama",
-          icon: "📊",
-          show: true,
-        },
-        {
-          href: "/dashboard/todos",
-          label: "To-Do List",
-          icon: "📋",
-          show: !isDigital,
-        },
-        {
-          href: "/dashboard/profile",
-          label: "Profil Saya",
-          icon: "👤",
-          show: true,
-        },
-        {
-          href: "/dashboard/leaderboard",
-          label: "Leaderboard",
-          icon: "🏆",
-          show: true,
-        },
-        {
-          href: "/dashboard/sales",
-          label: "Key-in Jualan",
-          icon: "💰",
-          show: canKeyInSale(role, positionCode) || manager,
-        },
-        {
-          href: "/dashboard/laporan-whatsapp",
-          label: "Laporan WhatsApp",
-          icon: "📱",
-          show: !isDigital,
-        },
-        {
-          href: "/dashboard/content-planner",
-          label: "Content Planner",
-          icon: "🗓️",
-          show: isContentTeam || isDigital || manager || role === "ceo",
-        },
-        {
-          href: "/dashboard/prestasi-konten",
-          label: "Prestasi Konten",
-          icon: "🎬",
-          show: isContentTeam || isDigital || manager || role === "ceo",
-        },
-        {
-          href: "/dashboard/tugasan-grafik",
-          label: "Tugasan Grafik",
-          icon: "🎨",
-          show: isDesigner || manager || role === "ceo",
-        },
-        {
-          href: "/dashboard/isu-pelanggan",
-          label: "Isu Pelanggan",
-          icon: "🚨",
-          show: isCS || manager || role === "ceo",
-        },
-        {
-          href: "/dashboard/laporan-chat",
-          label: "Laporan Chat",
-          icon: "💬",
-          show: isCS || manager || role === "ceo",
-        },
-        {
-          href: "/dashboard/recovery",
-          label: "Recovery CRM",
-          icon: "🔄",
-          show: isCrmOwner || manager || role === "ceo",
-        },
-        {
-          href: "https://masdora-crm-masdora.zocomputer.io/",
-          label: "Buka Sistem CRM",
-          icon: "🔗",
-          // Najjati yang menguruskan recovery, tetapi Marketing Manager & CEO
-          // juga perlu boleh masuk sistem CRM itu untuk memantau. Sama dengan
-          // kebenaran halaman "Recovery CRM" di atas.
-          show: isCrmOwner || manager || role === "ceo",
-          external: true,
-        },
-      ],
-    },
-    {
-      title: "Urus",
-      items: [
-        {
-          href: "/dashboard/laporan-mingguan",
-          label: "Laporan & PDF",
-          icon: "📄",
-          show: manager || role === "ceo",
-        },
-        {
-          href: "/dashboard/campaigns",
-          label: "Kempen & Pelancaran",
-          icon: "🎉",
-          show: !isDigital,
-        },
-        {
-          href: "/dashboard/admin/master",
-          label: "Master Setting",
-          icon: "🔐",
-          show: manager,
-        },
-        {
-          href: "/dashboard/admin/users",
-          label: "Pengurusan Pengguna",
-          icon: "👥",
-          show: manager,
-        },
-        {
-          href: "/dashboard/admin",
-          label: "Data & Tetapan",
-          icon: "⚙️",
-          show: manager,
-        },
-      ],
-    },
-  ];
+  // Menu dibina daripada katalog menu (lib/menu.ts). Kalau Marketing
+  // Manager sudah menetapkan akses bagi jawatan ini dalam Master Setting,
+  // tetapan itu digunakan; kalau tidak, kebenaran asal digunakan.
+  //
+  // Manager & CEO tidak pernah tertakluk kepada matriks akses, supaya
+  // tiada siapa boleh mengunci diri sendiri keluar dari dashboard.
+  const konteks: KonteksMenu = {
+    manager,
+    ceo: role === "ceo",
+    bolehJual: canKeyInSale(role, positionCode),
+    isCS,
+    isContentTeam,
+    isDesigner,
+    isDigital,
+    isCrmOwner,
+  };
+
+  const senaraiDitetapkan =
+    !manager && role !== "ceo" && positionCode
+      ? akses[positionCode]
+      : undefined;
+
+  function bolehLihat(item: ItemMenu): boolean {
+    if (item.wajib) return true;
+    if (item.hanyaManager) return manager;
+    if (senaraiDitetapkan) return senaraiDitetapkan.includes(item.key);
+    return item.asal(konteks);
+  }
+
+  const groups: NavGroup[] = (
+    [
+      { title: "Kerja Saya", kumpulan: "kerja" as const },
+      { title: "Urus", kumpulan: "urus" as const },
+    ] satisfies { title: string; kumpulan: "kerja" | "urus" }[]
+  ).map((g) => ({
+    title: g.title,
+    items: MENU.filter((m) => m.kumpulan === g.kumpulan).map((m) => ({
+      href: m.href,
+      label: m.label,
+      icon: m.icon,
+      show: bolehLihat(m),
+      external: m.external,
+    })),
+  }));
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -222,7 +150,7 @@ export default function Sidebar({
         <div>
           <MasdoraWordmark height={14} color="#F26122" />
           <p className="mt-1 text-[11px] leading-tight text-muted">
-            Team Dashboard
+            {tajuk || "Team Dashboard"}
           </p>
         </div>
       </div>
